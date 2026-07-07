@@ -10,44 +10,51 @@ const SUPABASE_URL = 'https://fvgifjyjuqddqtdegdxm.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_G1ZS3ahLvSf-p_tdCBbjww_t4jVwD8u';
 
 export default async (req) => {
-    if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
-    if (!RESEND_API_KEY) return new Response(JSON.stringify({ skipped: true, reason: 'no RESEND_API_KEY set' }), { status: 200 });
+      if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+      if (!RESEND_API_KEY) return new Response(JSON.stringify({ skipped: true, reason: 'no RESEND_API_KEY set' }), { status: 200 });
 
-    try {
-          const { projectId, stepId, assigneeEmail } = await req.json();
-          if (!projectId || !stepId || !assigneeEmail) return new Response('Missing fields', { status: 400 });
+      try {
+              const { projectId, stepId, assigneeEmail, assignedByEmail, siteUrl } = await req.json();
+              if (!projectId || !stepId || !assigneeEmail) return new Response('Missing fields', { status: 400 });
 
-      const headers = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
-          const [projectRes, stepRes, memberRes] = await Promise.all([
-                  fetch(`${SUPABASE_URL}/rest/v1/team_projects?id=eq.${projectId}&select=name`, { headers }),
-                  fetch(`${SUPABASE_URL}/rest/v1/team_project_steps?id=eq.${stepId}&select=step_name`, { headers }),
-                  fetch(`${SUPABASE_URL}/rest/v1/team_members?email=eq.${encodeURIComponent(assigneeEmail)}&select=name`, { headers })
-                ]);
-          const [project] = await projectRes.json();
-          const [step] = await stepRes.json();
-          const [member] = await memberRes.json();
-          if (!project || !step) return new Response('Not found', { status: 404 });
+        const headers = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY };
+              const [projectRes, stepRes, membersRes] = await Promise.all([
+                        fetch(`${SUPABASE_URL}/rest/v1/team_projects?id=eq.${projectId}&select=name`, { headers }),
+                        fetch(`${SUPABASE_URL}/rest/v1/team_project_steps?id=eq.${stepId}&select=step_name,due_date,note`, { headers }),
+                        fetch(`${SUPABASE_URL}/rest/v1/team_members?select=email,name`, { headers })
+                      ]);
+              const [project] = await projectRes.json();
+              const [step] = await stepRes.json();
+              const members = await membersRes.json();
+              if (!project || !step) return new Response('Not found', { status: 404 });
 
-      const naam = member ? member.name : assigneeEmail;
-          const html = `
-                <p>Hoi ${naam},</p>
-                      <p>Je bent toegewezen aan een taak buiten je eigen project in de RMN Team Projecttool:</p>
-                            <p><strong>${escapeHtml(step.step_name)}</strong><br>Project: ${escapeHtml(project.name)}</p>
-                                  <p>Log in om de taak te bekijken.</p>
-                                      `;
+        const nameFor = (email) => (members.find(m => m.email === email) || {}).name || email;
+              const naam = nameFor(assigneeEmail);
+              const assignerNaam = assignedByEmail ? nameFor(assignedByEmail) : null;
+              const dueDateStr = step.due_date ? new Date(step.due_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }) : null;
+              const link = siteUrl ? `${siteUrl}?project=${encodeURIComponent(projectId)}` : null;
 
-      await fetch('https://api.resend.com/emails', {
-              method: 'POST',
-              headers: { Authorization: 'Bearer ' + RESEND_API_KEY, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ from: FROM_EMAIL, to: assigneeEmail, subject: `Nieuwe taak: ${step.step_name}`, html })
-      });
+        const html = `
+              <p>Hoi ${escapeHtml(naam)},</p>
+                    <p>${assignerNaam ? escapeHtml(assignerNaam) + ' heeft je' : 'Je bent'} toegewezen aan een taak buiten je eigen project in de RMN Team Projecttool:</p>
+                          <p><strong>${escapeHtml(step.step_name)}</strong><br>
+                                Project: ${escapeHtml(project.name)}${dueDateStr ? `<br>Deadline: ${escapeHtml(dueDateStr)}` : ''}</p>
+                                      ${step.note ? `<p>Notitie bij de taak:<br><em>${escapeHtml(step.note)}</em></p>` : ''}
+                                            ${link ? `<p><a href="${link}">Bekijk de taak in de tool</a></p>` : '<p>Log in om de taak te bekijken.</p>'}
+                                                `;
 
-      return new Response(JSON.stringify({ sent: true }), { status: 200 });
-    } catch (err) {
-          return new Response(JSON.stringify({ error: err.message }), { status: 500 });
-    }
+        await fetch('https://api.resend.com/emails', {
+                  method: 'POST',
+                  headers: { Authorization: 'Bearer ' + RESEND_API_KEY, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ from: FROM_EMAIL, to: assigneeEmail, subject: `Nieuwe taak: ${step.step_name}`, html })
+        });
+
+        return new Response(JSON.stringify({ sent: true }), { status: 200 });
+      } catch (err) {
+              return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+      }
 };
 
 function escapeHtml(s) {
-    return String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      return String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
