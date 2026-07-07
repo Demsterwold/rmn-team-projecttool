@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RMN Team Projecttool</title>
+<title>Creative Studio Planning</title>
 <style>
 :root {
   --bg: #f6f6f4; --panel: #ffffff; --panel-hover: #f0f0ee; --border: #e3e3df;
@@ -124,12 +124,14 @@ button:disabled { opacity: 0.5; cursor: default; }
 .tl-nav { display: flex; align-items: center; gap: 8px; }
 .tl-nav .tl-label { font-size: 13px; font-family: var(--mono); color: var(--text-dim); min-width: 140px; text-align: center; }
 .timeline { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; padding: 14px 18px; }
-.tl-ruler { position: relative; height: 46px; }
-.tl-ruler-track { position: absolute; top: 18px; left: 0; right: 0; height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; }
-.tl-ruler-fill { position: absolute; top: 0; bottom: 0; background: var(--accent); opacity: 0.75; border-radius: 4px; }
-.tl-ruler-today { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--red); z-index: 3; }
-.tl-ruler-marker { position: absolute; top: -3px; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--panel); transform: translateX(-50%); cursor: help; z-index: 2; }
-.tl-ruler-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-faint); font-family: var(--mono); margin-top: 4px; }
+.tlcal-daynums { display: flex; margin-left: 112px; margin-bottom: 4px; }
+.tlcal-daynums span { flex: 1; text-align: center; font-size: 10px; color: var(--text-faint); font-family: var(--mono); }
+.tlcal-row { display: flex; align-items: center; gap: 10px; }
+.tlcal-rowlabel { width: 100px; flex-shrink: 0; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.tlcal-track { position: relative; flex: 1; height: 30px; background: var(--bg); border-radius: 6px; }
+.tlcal-bar { position: absolute; top: 4px; bottom: 4px; border-radius: 6px; display: flex; align-items: center; padding: 0 8px; color: #fff; font-size: 11px; font-weight: 600; overflow: hidden; white-space: nowrap; cursor: default; }
+.tlcal-break { position: absolute; top: -5px; bottom: -5px; width: 2px; background: rgba(0,0,0,0.45); cursor: help; }
+.tlcal-today { position: absolute; top: -6px; bottom: -6px; width: 2px; background: var(--red); z-index: 3; }
 
 .project-concept { margin: 18px 0; }
 .project-concept label { display: block; font-size: 11px; color: var(--text-faint); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -155,11 +157,14 @@ button:disabled { opacity: 0.5; cursor: default; }
 .step.done .step-check { background: var(--green); border-color: var(--green); color: #fff; }
 .step-main { flex: 1; min-width: 0; }
 .step-name { line-height: 1.4; }
-.step-name[contenteditable="true"] { outline: 1px dashed var(--accent); border-radius: 3px; padding: 0 2px; }
+.step-name[contenteditable="true] { outline: 1px dashed var(--accent); border-radius: 3px; padding: 0 2px; }
 .step.done .step-name { color: var(--text-dim); text-decoration: line-through; text-decoration-color: var(--text-faint); }
 .step-due { font-size: 11px; color: var(--text-faint); font-family: var(--mono); margin-top: 2px; }
 .step-assignee { font-size: 11px; color: var(--accent); margin-top: 2px; font-weight: 600; }
 .step-note-text { font-size: 12px; color: var(--text-dim); margin-top: 4px; cursor: pointer; }
+.step-url { font-size: 12px; margin-top: 4px; }
+.step-url a { color: var(--accent); text-decoration: none; }
+.step-url a:hover { text-decoration: underline; }
 .prio-flag { border: none; background: transparent; font-size: 15px; line-height: 1; padding: 2px 4px; cursor: pointer; color: var(--text-faint); opacity: 0.6; }
 .prio-flag:hover { opacity: 1; }
 .prio-flag.prio-none { color: var(--text-faint); }
@@ -202,7 +207,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 <body>
 <div class="wrap">
   <header>
-    <h1 id="homeLink">RMN <span>team projecttool</span></h1>
+    <h1 id="homeLink">Creative Studio <span>planning</span></h1>
     <div class="header-actions">
       <span class="user-badge" id="userBadge"></span>
       <button class="ghost small hidden" id="settingsBtn">&#9881; Team</button>
@@ -243,7 +248,9 @@ function currentIsModerator() { const m = memberByEmail(currentUserEmail); retur
 async function notifyAssignment(projectId, stepId, assigneeEmail, assignedByEmail) {
   try {
     await fetch('/.netlify/functions/notify-assignment', {
-      method: 'POST', headers: {'Content-Type':'application/json'},      body: JSON.stringify({ projectId, stepId, assigneeEmail, assignedByEmail, siteUrl: window.location.origin + window.location.pathname })    });
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ projectId, stepId, assigneeEmail, assignedByEmail, siteUrl: window.location.origin + window.location.pathname })
+    });
   } catch (e) { /* notificatie is best-effort, mag falen */ }
 }
 async function notifyNewMember(email, name) {
@@ -822,27 +829,78 @@ async function saveConcept(projectId) {
   catch (err) { alert('Opslaan mislukt: ' + err.message); }
 }
 
-// ---- Simplified timeline: a single date-range ruler with due-date markers ----
+// ---- Calendar-style timeline: month view with a progress bar + deadline breaks ----
+const tlState = { anchor: null };
 function renderDetailTimeline(p, steps) {
   const el = document.getElementById('detailTimeline');
   if (!p.start_date && !p.launch_date) { el.innerHTML = ''; return; }
-  const start = p.start_date ? new Date(p.start_date) : new Date();
-  const end = p.launch_date ? new Date(p.launch_date) : new Date(start.getTime() + 30*86400000);
-  const span = Math.max(1, end - start);
+  tlState.anchor = p.start_date ? new Date(p.start_date) : new Date();
+  renderTimelineMonth(p, steps);
+}
+function renderTimelineMonth(p, steps) {
+  const el = document.getElementById('detailTimeline');
+  const anchor = tlState.anchor;
+  const monthStart = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+  const monthEnd = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0);
+  const daysInMonth = monthEnd.getDate();
   const today = new Date();
-  const pctFor = (d) => Math.min(100, Math.max(0, ((d - start) / span) * 100));
-  const dueMarkers = steps.filter(s => s.due_date).map(s => ({ pct: pctFor(new Date(s.due_date)), label: s.step_name, done: s.status==='done' }));
-  const todayPct = pctFor(today);
+
+  const start = p.start_date ? new Date(p.start_date) : null;
+  const end = p.launch_date ? new Date(p.launch_date) : null;
+
+  let barStartDay = null, barEndDay = null;
+  if (start && end) {
+    const segStart = start < monthStart ? monthStart : start;
+    const segEnd = end > monthEnd ? monthEnd : end;
+    if (segEnd >= monthStart && segStart <= monthEnd) {
+      barStartDay = segStart.getDate();
+      barEndDay = segEnd.getDate();
+    }
+  }
+
+  const doneCount = steps.filter(s => s.status === 'done').length;
+  const totalCount = steps.length;
+
+  const deadlineDays = steps.filter(s => s.due_date).map(s => {
+    const d = new Date(s.due_date);
+    return { day: d.getDate(), inMonth: d.getFullYear() === anchor.getFullYear() && d.getMonth() === anchor.getMonth(), label: s.step_name };
+  }).filter(m => m.inMonth);
+
+  const todayInMonth = today.getFullYear() === anchor.getFullYear() && today.getMonth() === anchor.getMonth();
+
+  const dayNumsHtml = Array.from({ length: daysInMonth }, (_, i) => `<span>${i + 1}</span>`).join('');
+
+  const barHtml = (barStartDay && barEndDay) ? `
+    <div class="tlcal-bar" style="left:${((barStartDay - 1) / daysInMonth) * 100}%; width:${((barEndDay - barStartDay + 1) / daysInMonth) * 100}%; background:${p.color};">
+      <span>${doneCount}/${totalCount} klaar</span>
+      ${deadlineDays.map(m => `<div class="tlcal-break" style="left:${((m.day - barStartDay) / (barEndDay - barStartDay + 1)) * 100}%" title="${escapeHtml(m.label)}"></div>`).join('')}
+    </div>` : '';
+
+  const todayLineHtml = todayInMonth ? `<div class="tlcal-today" style="left:${((today.getDate() - 0.5) / daysInMonth) * 100}%" title="Vandaag"></div>` : '';
+
+  const monthLabel = anchor.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' });
+
   el.innerHTML = `
-    <div class="timeline">
-      <div class="tl-ruler">
-        <div class="tl-ruler-track"><div class="tl-ruler-fill" style="left:0; width:${Math.min(100,todayPct)}%;"></div></div>
-        ${(todayPct>=0 && todayPct<=100) ? `<div class="tl-ruler-today" style="left:${todayPct}%;" title="Vandaag"></div>` : ''}
-        ${dueMarkers.map(m => `<div class="tl-ruler-marker" style="left:${m.pct}%; background:${m.done?'var(--green)':'var(--accent)'};" title="${escapeHtml(m.label)}"></div>`).join('')}
+    <div class="tl-controls">
+      <div class="tl-zoom"><button class="active">Maand</button></div>
+      <div class="tl-nav">
+        <button class="icon" id="tlPrev">\u2190</button>
+        <span class="tl-label">${monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}</span>
+        <button class="icon" id="tlNext">\u2192</button>
+        <button class="small" id="tlToday">Vandaag</button>
       </div>
-      <div class="tl-ruler-labels"><span>${isoToDutch(toIso(start))}</span><span>${isoToDutch(toIso(end))}</span></div>
+    </div>
+    <div class="timeline">
+      <div class="tlcal-daynums">${dayNumsHtml}</div>
+      <div class="tlcal-row">
+        <div class="tlcal-rowlabel"><span class="dot" style="background:${p.color}"></span> Taken</div>
+        <div class="tlcal-track">${todayLineHtml}${barHtml}</div>
+      </div>
     </div>
   `;
+  document.getElementById('tlPrev').onclick = () => { tlState.anchor = new Date(anchor.getFullYear(), anchor.getMonth() - 1, 1); renderTimelineMonth(p, steps); };
+  document.getElementById('tlNext').onclick = () => { tlState.anchor = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1); renderTimelineMonth(p, steps); };
+  document.getElementById('tlToday').onclick = () => { tlState.anchor = new Date(); renderTimelineMonth(p, steps); };
 }
 
 function stepHtml(projectId, s, readOnly, ownerEmail) {
@@ -859,11 +917,14 @@ function stepHtml(projectId, s, readOnly, ownerEmail) {
         ${s.due_date ? `<div class="step-due">${fmtDate(s.due_date)}</div>` : ''}
         ${s.assignee_email ? `<div class="step-assignee" style="color:${memberColor(s.assignee_email)}">\u{1F464} ${escapeHtml(memberName(s.assignee_email))}</div>` : ''}
         ${s.note ? `<div class="step-note-text" onclick="${readOnly?'':`startEditNote('${s.id}')`}">${escapeHtml(s.note)}</div>` : ''}
+        ${s.url ? `<div class="step-url"><a href="${escapeHtml(s.url)}" target="_blank" rel="noopener">\u{1F517} ${escapeHtml(s.url.replace(/^https?:\/\//,''))}</a></div>` : ''}
       </div>
       ${readOnly ? '' : `
       <button class="prio-flag prio-${prio||'none'}" title="Prioriteit instellen" onclick="cyclePriority('${projectId}','${s.id}','${prio}')">\u2691</button>
       <div class="step-actions">
         <button title="Toewijzen" onclick="assignStepUI('${projectId}','${s.id}','${escapeHtml(s.assignee_email||'').replace(/'/g,"&#39;")}','${escapeHtml(ownerEmail||'').replace(/'/g,"&#39;")}')">\u{1F464}</button>
+        <button title="Deadline" onclick="setStepDeadlineUI('${projectId}','${s.id}','${escapeHtml(isoToDutch(s.due_date))}')">\u{1F4C5}</button>
+        <button title="URL" onclick="setStepUrlUI('${projectId}','${s.id}','${escapeHtml(s.url||'').replace(/'/g,"&#39;")}')">\u{1F517}</button>
         <button title="Notitie" onclick="startEditNote('${s.id}')">\u{1F4DD}</button>
         <button title="Naam aanpassen" onclick="startRenameStep('${s.id}')">\u270e</button>
         <button title="Verwijderen" onclick="deleteStepUI('${projectId}','${s.id}')">\u00d7</button>
@@ -919,6 +980,61 @@ function startEditNote(stepId) {
   if (note === null) return;
   sbUpdate('team_project_steps', 'id=eq.' + stepId, { note }).then(() => location.reload()).catch(e => alert('Opslaan mislukt: ' + e.message));
 }
+function setStepDeadlineUI(projectId, stepId, currentDutch) {
+  if (!requireLogin()) return;
+  renderModal(`
+    <h2>Deadline instellen</h2>
+    ${dateFieldHtml('stepDeadline', 'Deadline', currentDutch || '')}
+    <div class="modal-actions"><button class="ghost" id="modalClear">Verwijderen</button><button class="ghost" id="modalCancel">Annuleren</button><button class="primary" id="modalSave">Opslaan</button></div>
+  `);
+  document.getElementById('modalCancel').onclick = closeModal;
+  document.getElementById('modalClear').onclick = async () => {
+    try { await sbUpdate('team_project_steps', 'id=eq.' + stepId, { due_date: null }); closeModal(); refreshProjectView(projectId); }
+    catch (e) { alert('Opslaan mislukt: ' + e.message); }
+  };
+  document.getElementById('modalSave').onclick = async () => {
+    const str = document.getElementById('stepDeadline').value.trim();
+    const d = str ? parseDutchDate(str) : null;
+    if (str && !d) { alert('Datum klopt niet.'); return; }
+    const btn = document.getElementById('modalSave');
+    btn.disabled = true; btn.textContent = 'Bezig\u2026';
+    try {
+      await sbUpdate('team_project_steps', 'id=eq.' + stepId, { due_date: d ? toIso(d) : null });
+      closeModal();
+      refreshProjectView(projectId);
+    } catch (e) {
+      alert('Opslaan mislukt: ' + e.message);
+      btn.disabled = false; btn.textContent = 'Opslaan';
+    }
+  };
+}
+function setStepUrlUI(projectId, stepId, currentUrl) {
+  if (!requireLogin()) return;
+  renderModal(`
+    <h2>URL toevoegen</h2>
+    <div class="field"><label>URL</label><input type="text" id="stepUrl" placeholder="https://..." value="${escapeHtml(currentUrl || '')}"></div>
+    <div class="modal-actions"><button class="ghost" id="modalClear">Verwijderen</button><button class="ghost" id="modalCancel">Annuleren</button><button class="primary" id="modalSave">Opslaan</button></div>
+  `);
+  document.getElementById('modalCancel').onclick = closeModal;
+  document.getElementById('modalClear').onclick = async () => {
+    try { await sbUpdate('team_project_steps', 'id=eq.' + stepId, { url: null }); closeModal(); refreshProjectView(projectId); }
+    catch (e) { alert('Opslaan mislukt: ' + e.message); }
+  };
+  document.getElementById('modalSave').onclick = async () => {
+    let url = document.getElementById('stepUrl').value.trim();
+    if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
+    const btn = document.getElementById('modalSave');
+    btn.disabled = true; btn.textContent = 'Bezig\u2026';
+    try {
+      await sbUpdate('team_project_steps', 'id=eq.' + stepId, { url: url || null });
+      closeModal();
+      refreshProjectView(projectId);
+    } catch (e) {
+      alert('Opslaan mislukt: ' + e.message);
+      btn.disabled = false; btn.textContent = 'Opslaan';
+    }
+  };
+}
 async function cyclePriority(projectId, stepId, current) {
   if (!requireLogin()) return;
   const order = ['', 'rood', 'oranje', 'groen'];
@@ -954,7 +1070,9 @@ function assignStepUI(projectId, stepId, currentEmail, ownerEmail) {
     const btn = document.getElementById('modalSave');
     btn.disabled = true; btn.textContent = 'Bezig\u2026';
     try {
-      await sbUpdate('team_project_steps', 'id=eq.' + stepId, { assignee_email: email || null });      if (email && email !== ownerEmail) notifyAssignment(projectId, stepId, email, currentUserEmail);      closeModal();
+      await sbUpdate('team_project_steps', 'id=eq.' + stepId, { assignee_email: email || null });
+      if (email && email !== ownerEmail) notifyAssignment(projectId, stepId, email, currentUserEmail);
+      closeModal();
       refreshProjectView(projectId);
     } catch (e) {
       alert('Toewijzen mislukt: ' + e.message);
@@ -1130,3 +1248,4 @@ if (__initialRoute.view === 'shared') {
 </script>
 </body>
 </html>
+
