@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+Page_DownPage_DownPage_Down<!DOCTYPE html>
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
@@ -243,9 +243,7 @@ function currentIsModerator() { const m = memberByEmail(currentUserEmail); retur
 async function notifyAssignment(projectId, stepId, assigneeEmail, assignedByEmail) {
   try {
     await fetch('/.netlify/functions/notify-assignment', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      async function notifyAssignment(projectId, stepId, assigneeEmail, assignedByEmail) {
-    });
+      method: 'POST', headers: {'Content-Type':'application/json'},      body: JSON.stringify({ projectId, stepId, assigneeEmail, assignedByEmail, siteUrl: window.location.origin + window.location.pathname })    });
   } catch (e) { /* notificatie is best-effort, mag falen */ }
 }
 async function notifyNewMember(email, name) {
@@ -956,9 +954,7 @@ function assignStepUI(projectId, stepId, currentEmail, ownerEmail) {
     const btn = document.getElementById('modalSave');
     btn.disabled = true; btn.textContent = 'Bezig\u2026';
     try {
-      await sbUpdate('team_project_steps', 'id=eq.' + stepId, { assignee_email: email || null });
-      body: JSON.stringify({ projectId, stepId, assigneeEmail, assignedByEmail, siteUrl: window.location.origin + window.location.pathname })
-      closeModal();
+      await sbUpdate('team_project_steps', 'id=eq.' + stepId, { assignee_email: email || null });      if (email && email !== ownerEmail) notifyAssignment(projectId, stepId, email, currentUserEmail);      closeModal();
       refreshProjectView(projectId);
     } catch (e) {
       alert('Toewijzen mislukt: ' + e.message);
