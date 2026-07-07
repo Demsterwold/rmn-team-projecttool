@@ -240,11 +240,11 @@ function memberByEmail(email) { return teamMembers.find(m => m.email === email);
 function memberColor(email) { const m = memberByEmail(email); return m ? m.color : '#9a9da6'; }
 function memberName(email) { const m = memberByEmail(email); return m ? m.name : email; }
 function currentIsModerator() { const m = memberByEmail(currentUserEmail); return !!(m && m.is_moderator); }
-async function notifyAssignment(projectId, stepId, assigneeEmail) {
+async function notifyAssignment(projectId, stepId, assigneeEmail, assignedByEmail) {
   try {
     await fetch('/.netlify/functions/notify-assignment', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ projectId, stepId, assigneeEmail })
+      async function notifyAssignment(projectId, stepId, assigneeEmail, assignedByEmail) {
     });
   } catch (e) { /* notificatie is best-effort, mag falen */ }
 }
@@ -957,7 +957,7 @@ function assignStepUI(projectId, stepId, currentEmail, ownerEmail) {
     btn.disabled = true; btn.textContent = 'Bezig\u2026';
     try {
       await sbUpdate('team_project_steps', 'id=eq.' + stepId, { assignee_email: email || null });
-      if (email && email !== ownerEmail) notifyAssignment(projectId, stepId, email);
+      body: JSON.stringify({ projectId, stepId, assigneeEmail, assignedByEmail, siteUrl: window.location.origin + window.location.pathname })
       closeModal();
       refreshProjectView(projectId);
     } catch (e) {
