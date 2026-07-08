@@ -170,10 +170,9 @@ button:disabled { opacity: 0.5; cursor: default; }
 .file-row { padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: 13px; display: flex; align-items: center; gap: 8px; }
 .file-row:last-child { border-bottom: none; }
 .file-row-main { flex: 1; min-width: 0; cursor: pointer; }
-.file-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); font-weight: 600; }
+.file-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-weight: 600; }
 .file-row-main:hover .file-row-name { text-decoration: underline; }
-.file-row-original { font-size: 10px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
-.file-row-meta { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+.file-row-sub { font-size: 11px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
 .file-row-delete { border: none; background: transparent; color: var(--text-faint); font-size: 15px; padding: 2px 6px; cursor: pointer; flex-shrink: 0; }
 .file-row-delete:hover { color: var(--red); }
 .file-drop-row { padding: 10px 12px; }
@@ -298,6 +297,18 @@ async function saveRmnOrder(orderMap) {
 function getProjectOrder(p) {
   if (p.external) return p.__order || 0;
   return parseProjectMeta(p).order || 0;
+}
+const FILE_LABELS_PATH = '_settings/file-labels.json';
+async function loadFileLabels() {
+  try {
+    const { data, error } = await authClient.storage.from('project-files').download(FILE_LABELS_PATH);
+    if (error) throw error;
+    return JSON.parse(await data.text());
+  } catch (e) { return {}; }
+}
+async function saveFileLabels(map) {
+  const blob = new Blob([JSON.stringify(map)], { type: 'application/json' });
+  await authClient.storage.from('project-files').upload(FILE_LABELS_PATH, blob, { upsert: true });
 }
 async function loadRmnProjects() {
   try {
@@ -1102,6 +1113,12 @@ async function openProject(projectId, isShared, fromHistory) {
     return;
   }
   if (!p) { view.innerHTML = '<div class="state-msg">Project niet gevonden.</div>'; return; }
+  if (!isShared && files && files.length) {
+    try {
+      const labelMap = await loadFileLabels();
+      files.forEach(f => { f.label = f.label || labelMap[f.id] || null; });
+    } catch (e) {}
+  }
   curProjectId = projectId; curProject = p; curSteps = steps; curIsShared = !!isShared;
 
   const cd = countdownLabel(p.launch_date);
@@ -1224,15 +1241,17 @@ function filesColHtml(p, files) {
 }
 function fileRowHtml(projectId, f) {
   const kb = f.size_bytes ? Math.round(f.size_bytes / 1024) : null;
-  const meta = [f.uploaded_by ? memberName(f.uploaded_by) : null, kb ? (kb > 1024 ? Math.round(kb/1024*10)/10 + ' MB' : kb + ' KB') : null].filter(Boolean).join(' \u00b7 ');
+  const sizeStr = kb ? (kb > 1024 ? Math.round(kb/1024*10)/10 + ' MB' : kb + ' KB') : null;
   const fileNameEsc = escapeHtml(f.file_name).replace(/'/g,"&#39;");
+  const labelEsc = escapeHtml(f.label || '').replace(/'/g,"&#39;");
   return `
     <div class="file-row" data-file-id="${f.id}">
       <div class="file-row-main" onclick="openProjectFile('${escapeHtml(f.storage_path)}','${fileNameEsc}')" title="Openen: ${escapeHtml(f.file_name)}">
         <div class="file-row-name">${escapeHtml(f.label || f.file_name)}</div>
-        ${f.label ? `<div class="file-row-original">${escapeHtml(f.file_name)}</div>` : ''}
-        ${meta ? `<div class="file-row-meta">${escapeHtml(meta)}</div>` : ''}
+        ${f.label ? `<div class="file-row-sub">${escapeHtml(f.file_name)}${sizeStr ? ' \u00b7 ' + sizeStr : ''}</div>` : (sizeStr ? `<div class="file-row-sub">${sizeStr}</div>` : '')}
+        ${f.uploaded_by ? `<div class="file-row-sub">${escapeHtml(memberName(f.uploaded_by))}</div>` : ''}
       </div>
+      <button class="file-row-delete" title="Naam aanpassen" onclick="event.stopPropagation(); renameProjectFileUI('${f.id}','${labelEsc}','${projectId}')" style="font-size:12px;">\u270e</button>
       <button class="file-row-delete" title="Verwijderen" onclick="event.stopPropagation(); deleteProjectFile('${f.id}','${escapeHtml(f.storage_path)}','${projectId}')">\u00d7</button>
     </div>`;
 }
@@ -1297,22 +1316,29 @@ async function startFileUpload(projectId, file) {
     const path = projectId + '/' + Date.now() + '_' + safeName;
     const { error: upErr } = await authClient.storage.from('project-files').upload(path, file);
     if (upErr) throw upErr;
-    const row = { id: uid('file'), project_id: projectId, file_name: file.name, storage_path: path, size_bytes: file.size, uploaded_by: currentUserEmail, label: label.trim() || null };
-    try {
-      await sbInsert('project_files', [row]);
-    } catch (insertErr) {
-      if (/label/i.test(insertErr.message)) {
-        delete row.label;
-        await sbInsert('project_files', [row]);
-      } else {
-        throw insertErr;
-      }
+    const fileId = uid('file');
+    await sbInsert('project_files', [{ id: fileId, project_id: projectId, file_name: file.name, storage_path: path, size_bytes: file.size, uploaded_by: currentUserEmail }]);
+    if (label.trim()) {
+      const labelMap = await loadFileLabels();
+      labelMap[fileId] = label.trim();
+      await saveFileLabels(labelMap);
     }
     refreshProjectView(projectId);
   } catch (e) {
     alert('Uploaden mislukt: ' + e.message);
     if (dropLabel && originalText) dropLabel.innerHTML = originalText;
   }
+}
+async function renameProjectFileUI(fileId, currentLabel, projectId) {
+  if (!requireLogin()) return;
+  const label = prompt('Naam voor dit bestand:', currentLabel || '');
+  if (label === null) return;
+  try {
+    const labelMap = await loadFileLabels();
+    if (label.trim()) labelMap[fileId] = label.trim(); else delete labelMap[fileId];
+    await saveFileLabels(labelMap);
+    refreshProjectView(projectId);
+  } catch (e) { alert('Opslaan mislukt: ' + e.message); }
 }
 function isNativelyViewable(fileName) {
   const ext = (fileName.split('.').pop() || '').toLowerCase();
