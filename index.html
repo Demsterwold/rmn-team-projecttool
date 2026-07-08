@@ -98,6 +98,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .proj-row .p-status { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 3px 8px; border-radius: 20px; white-space: nowrap; order: 6; }
 .status-in_productie { background: rgba(59,111,224,0.12); color: var(--accent); }
 .status-live { background: rgba(63,157,109,0.12); color: var(--green); }
+.status-archived { background: rgba(154,157,166,0.18); color: var(--text-faint); }
 .p-countdown { font-family: var(--mono); font-size: 12px; color: var(--text-dim); white-space: nowrap; order: 7; margin-left: auto; }
 .p-countdown.soon { color: var(--orange); font-weight: 700; }
 .p-countdown.overdue { color: var(--red); font-weight: 700; }
@@ -137,9 +138,27 @@ button:disabled { opacity: 0.5; cursor: default; }
 .project-concept label { display: block; font-size: 11px; color: var(--text-faint); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.05em; }
 .project-concept textarea { width: 100%; min-height: 70px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); padding: 10px 12px; font-family: var(--sans); font-size: 13px; resize: vertical; }
 
-.tracks { display: grid; grid-template-columns: 1fr; gap: 16px; margin: 24px 0 28px; max-width: 640px; }
+.tracks { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin: 24px 0 28px; max-width: 960px; align-items: start; }
 .track-col { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; }
 .track-head { padding: 12px 16px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.add-track-btn { border: 1.5px dashed var(--border); background: transparent; border-radius: var(--radius); min-height: 60px; display: flex; align-items: center; justify-content: center; color: var(--text-faint); font-size: 13px; cursor: pointer; }
+.add-track-btn:hover { border-color: var(--accent); color: var(--accent); }
+.file-list { display: flex; flex-direction: column; }
+.file-row { padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: 13px; display: flex; align-items: center; gap: 8px; }
+.file-row:last-child { border-bottom: none; }
+.file-row-main { flex: 1; min-width: 0; }
+.file-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; color: var(--accent); }
+.file-row-name:hover { text-decoration: underline; }
+.file-row-meta { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+.file-row-delete { border: none; background: transparent; color: var(--text-faint); font-size: 15px; padding: 2px 6px; cursor: pointer; flex-shrink: 0; }
+.file-row-delete:hover { color: var(--red); }
+.file-drop-row { padding: 10px 12px; }
+.file-drop-row input[type="file"] { display: none; }
+.file-drop-label { display: block; text-align: center; padding: 10px; border: 1.5px dashed var(--border); border-radius: 7px; font-size: 12px; color: var(--text-dim); cursor: pointer; }
+.file-drop-label:hover { border-color: var(--accent); color: var(--accent); }
+.file-drop-label.drag-active { border-color: var(--accent); color: var(--accent); background: rgba(59,111,224,0.06); }
+.file-label { display: inline-block; background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px; margin-right: 4px; text-transform: uppercase; letter-spacing: 0.03em; }
+.file-empty { padding: 20px 16px; text-align: center; color: var(--text-faint); font-size: 12px; }
 .track-head-left { display: flex; align-items: center; gap: 8px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .step-list { display: flex; flex-direction: column; }
@@ -210,6 +229,7 @@ button:disabled { opacity: 0.5; cursor: default; }
     <h1 id="homeLink">Creative Studio <span>planning</span></h1>
     <div class="header-actions">
       <span class="user-badge" id="userBadge"></span>
+      <button class="ghost small hidden" id="archiveBtn">&#128451; Archief</button>
       <button class="ghost small hidden" id="settingsBtn">&#9881; Team</button>
       <button class="ghost small" id="authBtn">Inloggen</button>
       <button class="primary" id="newProjectBtn">+ Nieuw project</button>
@@ -303,6 +323,7 @@ function applyAuthState(session) {
   const btn = document.getElementById('authBtn');
   const badge = document.getElementById('userBadge');
   const settingsBtn = document.getElementById('settingsBtn');
+  const archiveBtn = document.getElementById('archiveBtn');
   if (isLoggedIn) {
     btn.textContent = 'Uitloggen';
     badge.textContent = currentUserEmail;
@@ -311,6 +332,7 @@ function applyAuthState(session) {
     badge.textContent = '';
   }
   if (settingsBtn) settingsBtn.classList.toggle('hidden', !currentIsModerator());
+  if (archiveBtn) archiveBtn.classList.toggle('hidden', !isLoggedIn);
 }
 async function handleAuthClick() {
   if (isLoggedIn) {
@@ -569,7 +591,7 @@ function renderMonthCalendar(containerId, projects) {
   wireCalControls(containerId, projects);
 }
 
-function renderProjectList(containerId, projects) {
+function renderProjectList(containerId, projects, title) {
   const container = document.getElementById(containerId);
   if (!projects.length) { container.innerHTML = ''; return; }
   const rows = projects.map(p => {
@@ -586,7 +608,7 @@ function renderProjectList(containerId, projects) {
       </div>
     `;
   }).join('');
-  container.innerHTML = `<div class="proj-list"><h3>Alle projecten</h3>${rows}</div>`;
+  container.innerHTML = `<div class="proj-list"><h3>${escapeHtml(title || 'Alle projecten')}</h3>${rows}</div>`;
 }
 
 // ================= Home view =================
@@ -596,7 +618,7 @@ async function loadHome() {
   const sidebar = document.getElementById('homeSidebar');
   calWrap.innerHTML = '<div class="state-msg">Laden\u2026</div>'; listWrap.innerHTML = ''; sidebar.innerHTML = '';
   try {
-    const projects = await sbSelect('team_projects', 'select=*&order=launch_date.asc.nullslast');
+    const projects = await sbSelect('team_projects', 'archived=eq.false&select=*&order=launch_date.asc.nullslast');
     calWrap.innerHTML = '<div id="homeCal"></div>';
     renderHomeCalendar('homeCal', projects);
     renderProjectList('homeListWrap', projects);
@@ -605,6 +627,35 @@ async function loadHome() {
   } catch (e) {
     calWrap.innerHTML = `<div class="state-msg">Kon projecten niet laden (${escapeHtml(e.message)}).<br><button class="small" onclick="loadHome()">Opnieuw proberen</button></div>`;
   }
+}
+let __archiveProjects = [];
+async function loadArchive() {
+  document.getElementById('detailView').classList.add('hidden');
+  document.getElementById('homeView').classList.remove('hidden');
+  const calWrap = document.getElementById('homeCalWrap');
+  const listWrap = document.getElementById('homeListWrap');
+  const sidebar = document.getElementById('homeSidebar');
+  sidebar.innerHTML = '';
+  calWrap.innerHTML = '<button class="back-btn ghost" onclick="loadHome()">\u2190 terug naar actieve projecten</button>';
+  listWrap.innerHTML = `
+    <div class="field" style="max-width:320px;margin:16px 0 0;">
+      <input type="text" id="archiveSearch" placeholder="Zoek op projectnaam\u2026" oninput="filterArchiveList()">
+    </div>
+    <div id="archiveListInner"><div class="state-msg">Laden\u2026</div></div>
+  `;
+  try {
+    __archiveProjects = await sbSelect('team_projects', 'archived=eq.true&select=*&order=launch_date.desc.nullslast');
+    filterArchiveList();
+  } catch (e) {
+    document.getElementById('archiveListInner').innerHTML = `<div class="state-msg">Kon archief niet laden (${escapeHtml(e.message)}).</div>`;
+  }
+}
+function filterArchiveList() {
+  const q = document.getElementById('archiveSearch').value.trim().toLowerCase();
+  const filtered = q ? __archiveProjects.filter(p => p.name.toLowerCase().includes(q)) : __archiveProjects;
+  renderProjectList('archiveListInner', filtered, 'Archief');
+  const inner = document.getElementById('archiveListInner');
+  if (!filtered.length) inner.innerHTML = __archiveProjects.length ? '<div class="state-msg">Geen projecten gevonden.</div>' : '<div class="state-msg">Het archief is nog leeg.</div>';
 }
 async function loadSidebarTodos(projects) {
   const sidebar = document.getElementById('homeSidebar');
@@ -771,11 +822,12 @@ async function openProject(projectId, isShared, fromHistory) {
   const view = document.getElementById('detailView');
   view.classList.remove('hidden');
   view.innerHTML = '<div class="state-msg">Laden\u2026</div>';
-  let p, steps;
+  let p, steps, files;
   try {
-    [p, steps] = await Promise.all([
+    [p, steps, files] = await Promise.all([
       sbSelect('team_projects', 'id=eq.' + projectId + '&select=*').then(r => r[0]),
-      sbSelect('team_project_steps', 'project_id=eq.' + projectId + '&select=*&order=order_num.asc')
+      sbSelect('team_project_steps', 'project_id=eq.' + projectId + '&select=*&order=order_num.asc'),
+      isShared ? Promise.resolve([]) : sbSelect('project_files', 'project_id=eq.' + projectId + '&select=*&order=created_at.desc').catch(() => [])
     ]);
   } catch (e) {
     view.innerHTML = `<div class="state-msg">Kon project niet laden (${escapeHtml(e.message)}).<br><button class="small" onclick="openProject('${projectId}',${!!isShared},true)">Opnieuw proberen</button></div>`;
@@ -784,6 +836,8 @@ async function openProject(projectId, isShared, fromHistory) {
   if (!p) { view.innerHTML = '<div class="state-msg">Project niet gevonden.</div>'; return; }
 
   const cd = countdownLabel(p.launch_date);
+  const takenSteps = steps.filter(s => (s.track || 'taken') === 'taken');
+  const extraSteps = steps.filter(s => s.track === 'extra');
 
   view.innerHTML = `
     <div class="detail-header">
@@ -792,9 +846,9 @@ async function openProject(projectId, isShared, fromHistory) {
         <div>
           <div class="detail-title-row">
             <h2 class="detail-title">${escapeHtml(p.name)}</h2>
-            ${isShared ? '' : `<button class="ghost edit-project-btn" onclick='editProjectModal(${JSON.stringify(p).replace(/'/g,"&#39;")})'>\u270e</button><button class="ghost share-project-btn" onclick="shareProject('${p.id}')">\u{1F517} Delen</button>`}
+            ${isShared ? '' : `<button class="ghost edit-project-btn" onclick='editProjectModal(${JSON.stringify(p).replace(/'/g,"&#39;")})'>\u270e</button><button class="ghost share-project-btn" onclick="shareProject('${p.id}')">\u{1F517} Delen</button><button class="ghost share-project-btn" onclick="toggleArchiveProject('${p.id}',${!!p.archived})">${p.archived ? '\u{1F4E4} Terugzetten' : '\u{1F5C4} Archiveren'}</button>`}
           </div>
-          <div class="detail-sub">${statusLabel(p.status)}${p.owner_email ? ' \u00b7 eigenaar: ' + escapeHtml(memberName(p.owner_email)) : ''} \u00b7 start ${isoToDutch(p.start_date)}</div>
+          <div class="detail-sub">${statusLabel(p.status)}${p.archived ? ' \u00b7 <span class="p-status status-archived" style="display:inline-block;">Gearchiveerd</span>' : ''}${p.owner_email ? ' \u00b7 eigenaar: ' + escapeHtml(memberName(p.owner_email)) : ''} \u00b7 start ${isoToDutch(p.start_date)}</div>
         </div>
       </div>
       ${p.launch_date ? `<div class="detail-header-right"><div class="countdown-badge ${cd.cls}">launch: ${cd.text}</div></div>` : ''}
@@ -805,21 +859,56 @@ async function openProject(projectId, isShared, fromHistory) {
       <textarea id="conceptInput_${p.id}" placeholder="Waar gaat dit project over, en voor wie is het bedoeld?" ${isShared?'readonly':''} onblur="saveConcept('${p.id}')">${escapeHtml(p.concept || '')}</textarea>
     </div>
     <div class="tracks">
-      <div class="track-col">
-        <div class="track-head"><div class="track-head-left"><span class="dot" style="background:${p.color}"></span>To-do's</div></div>
-        <div class="step-list" id="steplist_taken" data-track="taken" data-project="${p.id}">
-          ${sortForDisplay(steps).map(s => stepHtml(p.id, s, isShared, p.owner_email)).join('')}
-        </div>
-        ${isShared ? '' : `
-        <div class="add-step-row">
-          <input type="text" placeholder="+ taak toevoegen" id="addstep_taken" onkeydown="if(event.key==='Enter') addStepUI('${p.id}')">
-          <button class="small" onclick="addStepUI('${p.id}')">Toevoegen</button>
-        </div>`}
-      </div>
+      ${trackColHtml(p, 'taken', "To-do's", takenSteps, isShared)}
+      ${p.extra_track_name ? trackColHtml(p, 'extra', p.extra_track_name, extraSteps, isShared) : (isShared ? '' : `<button class="add-track-btn" onclick="addExtraTrackUI('${p.id}')">+ Extra lijst toevoegen</button>`)}
+      ${isShared ? '' : filesColHtml(p, files || [])}
     </div>
   `;
   renderDetailTimeline(p, steps);
-  if (!isShared) setupDragDrop(document.getElementById('steplist_taken'));
+  if (!isShared) {
+    setupDragDrop(document.getElementById('steplist_taken'));
+    if (p.extra_track_name) setupDragDrop(document.getElementById('steplist_extra'));
+  }
+}
+function trackColHtml(p, trackKey, label, trackSteps, isShared) {
+  return `
+      <div class="track-col">
+        <div class="track-head"><div class="track-head-left"><span class="dot" style="background:${p.color}"></span>${escapeHtml(label)}</div>${(trackKey==='extra' && !isShared) ? `<button class="ghost" style="padding:2px 6px;font-size:13px;" title="Lijst verwijderen" onclick="removeExtraTrackUI('${p.id}')">\u00d7</button>` : ''}</div>
+        <div class="step-list" id="steplist_${trackKey}" data-track="${trackKey}" data-project="${p.id}">
+          ${sortForDisplay(trackSteps).map(s => stepHtml(p.id, s, isShared, p.owner_email)).join('')}
+        </div>
+        ${isShared ? '' : `
+        <div class="add-step-row">
+          <input type="text" placeholder="+ taak toevoegen" id="addstep_${trackKey}" onkeydown="if(event.key==='Enter') addStepUI('${p.id}','${trackKey}')">
+          <button class="small" onclick="addStepUI('${p.id}','${trackKey}')">Toevoegen</button>
+        </div>`}
+      </div>`;
+}
+function filesColHtml(p, files) {
+  return `
+      <div class="track-col">
+        <div class="track-head"><div class="track-head-left">\u{1F4CE} Bestanden</div></div>
+        <div class="file-list" id="filelist_${p.id}">
+          ${files.length ? files.map(f => fileRowHtml(p.id, f)).join('') : '<div class="file-empty">Nog geen bestanden</div>'}
+        </div>
+        <div class="file-drop-row">
+          <label class="file-drop-label" id="fileDropLabel_${p.id}" ondragover="event.preventDefault(); this.classList.add('drag-active')" ondragleave="this.classList.remove('drag-active')" ondrop="handleFileDrop(event,'${p.id}')">+ Bestand uploaden of slepen (Word, Excel, PPT, script\u2026)
+            <input type="file" id="fileInput_${p.id}" onchange="handleFileInputChange('${p.id}')">
+          </label>
+        </div>
+      </div>`;
+}
+function fileRowHtml(projectId, f) {
+  const kb = f.size_bytes ? Math.round(f.size_bytes / 1024) : null;
+  const meta = [f.uploaded_by ? memberName(f.uploaded_by) : null, kb ? (kb > 1024 ? Math.round(kb/1024*10)/10 + ' MB' : kb + ' KB') : null].filter(Boolean).join(' \u00b7 ');
+  return `
+    <div class="file-row" data-file-id="${f.id}">
+      <div class="file-row-main">
+        <div class="file-row-name" onclick="openProjectFile('${escapeHtml(f.storage_path)}')" title="${escapeHtml(f.file_name)}">${f.label ? `<span class="file-label">${escapeHtml(f.label)}</span> ` : ''}${escapeHtml(f.file_name)}</div>
+        ${meta ? `<div class="file-row-meta">${escapeHtml(meta)}</div>` : ''}
+      </div>
+      <button class="file-row-delete" title="Verwijderen" onclick="deleteProjectFile('${f.id}','${escapeHtml(f.storage_path)}','${projectId}')">\u00d7</button>
+    </div>`;
 }
 async function saveConcept(projectId) {
   if (!requireLogin()) return;
@@ -827,6 +916,75 @@ async function saveConcept(projectId) {
   if (!textarea) return;
   try { await sbUpdate('team_projects', 'id=eq.' + projectId, { concept: textarea.value }); }
   catch (err) { alert('Opslaan mislukt: ' + err.message); }
+}
+async function toggleArchiveProject(projectId, currentlyArchived) {
+  if (!requireLogin()) return;
+  try { await sbUpdate('team_projects', 'id=eq.' + projectId, { archived: !currentlyArchived }); refreshProjectView(projectId); }
+  catch (e) { alert('Opslaan mislukt: ' + e.message); }
+}
+function addExtraTrackUI(projectId) {
+  if (!requireLogin()) return;
+  const name = prompt('Naam van de extra lijst (bijv. "Marketing & distributie"):');
+  if (!name || !name.trim()) return;
+  sbUpdate('team_projects', 'id=eq.' + projectId, { extra_track_name: name.trim() }).then(() => refreshProjectView(projectId)).catch(e => alert('Opslaan mislukt: ' + e.message));
+}
+function removeExtraTrackUI(projectId) {
+  if (!requireLogin()) return;
+  if (!confirm('Deze extra lijst en alle taken erin verwijderen?')) return;
+  sbDelete('team_project_steps', 'project_id=eq.' + projectId + '&track=eq.extra')
+    .then(() => sbUpdate('team_projects', 'id=eq.' + projectId, { extra_track_name: null }))
+    .then(() => refreshProjectView(projectId))
+    .catch(e => alert('Verwijderen mislukt: ' + e.message));
+}
+function handleFileInputChange(projectId) {
+  const input = document.getElementById('fileInput_' + projectId);
+  const file = input.files[0];
+  input.value = '';
+  if (file) startFileUpload(projectId, file);
+}
+function handleFileDrop(event, projectId) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('drag-active');
+  if (!requireLogin()) return;
+  const file = event.dataTransfer.files && event.dataTransfer.files[0];
+  if (file) startFileUpload(projectId, file);
+}
+async function startFileUpload(projectId, file) {
+  if (!requireLogin()) return;
+  const label = prompt('Wat voor bestand is dit? (bijv. Brandbook, Script, Draaiboek \u2014 mag leeg blijven)', '');
+  if (label === null) return;
+  const dropLabel = document.getElementById('fileDropLabel_' + projectId);
+  const originalText = dropLabel ? dropLabel.innerHTML : null;
+  if (dropLabel) dropLabel.textContent = 'Bezig met uploaden\u2026';
+  try {
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = projectId + '/' + Date.now() + '_' + safeName;
+    const { error: upErr } = await authClient.storage.from('project-files').upload(path, file);
+    if (upErr) throw upErr;
+    await sbInsert('project_files', [{ id: uid('file'), project_id: projectId, file_name: file.name, storage_path: path, size_bytes: file.size, uploaded_by: currentUserEmail, label: label.trim() || null }]);
+    refreshProjectView(projectId);
+  } catch (e) {
+    alert('Uploaden mislukt: ' + e.message);
+    if (dropLabel && originalText) dropLabel.innerHTML = originalText;
+  }
+}
+async function openProjectFile(storagePath) {
+  try {
+    const { data, error } = await authClient.storage.from('project-files').createSignedUrl(storagePath, 3600);
+    if (error) throw error;
+    window.open(data.signedUrl, '_blank');
+  } catch (e) {
+    alert('Kon bestand niet openen: ' + e.message);
+  }
+}
+async function deleteProjectFile(fileId, storagePath, projectId) {
+  if (!requireLogin()) return;
+  if (!confirm('Dit bestand verwijderen?')) return;
+  try {
+    await authClient.storage.from('project-files').remove([storagePath]);
+    await sbDelete('project_files', 'id=eq.' + fileId);
+    refreshProjectView(projectId);
+  } catch (e) { alert('Verwijderen mislukt: ' + e.message); }
 }
 
 // ---- Calendar-style timeline: month view with a progress bar + deadline breaks ----
@@ -933,20 +1091,22 @@ function stepHtml(projectId, s, readOnly, ownerEmail) {
   `;
 }
 
-async function addStepUI(projectId) {
+async function addStepUI(projectId, track) {
   if (!requireLogin()) return;
-  const input = document.getElementById('addstep_taken');
+  track = track || 'taken';
+  const input = document.getElementById('addstep_' + track);
   const text = input.value.trim();
   if (!text) return;
   input.value = '';
-  try { await addStep(projectId, text); refreshProjectView(projectId); }
+  try { await addStep(projectId, text, track); refreshProjectView(projectId); }
   catch (err) { alert('Kon taak niet toevoegen: ' + err.message); }
 }
-async function addStep(projectId, stepName) {
+async function addStep(projectId, stepName, track) {
   if (!requireLogin()) return;
-  const steps = await sbSelect('team_project_steps', 'project_id=eq.' + projectId + '&select=order_num&order=order_num.desc&limit=1');
+  track = track || 'taken';
+  const steps = await sbSelect('team_project_steps', 'project_id=eq.' + projectId + '&track=eq.' + track + '&select=order_num&order=order_num.desc&limit=1');
   const maxOrder = steps.length ? steps[0].order_num : 0;
-  const rows = await sbInsert('team_project_steps', [{ id: uid('step'), project_id: projectId, order_num: maxOrder+1, step_name: stepName, status: 'pending', subtasks: [] }]);
+  const rows = await sbInsert('team_project_steps', [{ id: uid('step'), project_id: projectId, order_num: maxOrder+1, step_name: stepName, status: 'pending', subtasks: [], track }]);
   return rows[0];
 }
 function refreshProjectView(projectId) { openProject(projectId); }
@@ -1229,6 +1389,7 @@ document.getElementById('authBtn').onclick = handleAuthClick;
 document.getElementById('newProjectBtn').onclick = showNewProjectModal;
 document.getElementById('homeLink').onclick = () => goHome();
 document.getElementById('settingsBtn').onclick = showTeamSettingsModal;
+document.getElementById('archiveBtn').onclick = loadArchive;
 
 const __initialRoute = parseRouteFromUrl();
 if (__initialRoute.view === 'shared') {
@@ -1248,4 +1409,3 @@ if (__initialRoute.view === 'shared') {
 </script>
 </body>
 </html>
-
