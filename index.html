@@ -782,7 +782,11 @@ function renderPlanningView(containerId, projects) {
   const today = new Date();
   const todayInMonth = today.getFullYear()===anchor.getFullYear() && today.getMonth()===anchor.getMonth();
 
-  const tabProjects = projects.filter(p => (p.status === 'ongoing') === (planningSubTab === 'doorlopend'));
+  const tabProjects = projects.filter(p => {
+    if (planningSubTab === 'podcast') return !!p.external;
+    if (p.external) return false;
+    return (p.status === 'ongoing') === (planningSubTab === 'doorlopend');
+  });
 
   let rows = tabProjects.map(p => {
     const range = computeBarRange(p, monthStart, monthEnd);
@@ -806,7 +810,7 @@ function renderPlanningView(containerId, projects) {
           <div class="plan-bar" style="left:${left}%;width:${width}%;${range.isOngoing ? `background:repeating-linear-gradient(90deg, ${color} 0 6px, ${color}99 6px 10px);` : `background:${color};`}" onclick="${calItemOnclick(p)}" title="${escapeHtml(p.name)}"></div>
         </div>
       </div>`;
-  }).join('') : `<div class="state-msg" style="padding:20px;">Geen ${planningSubTab === 'doorlopend' ? 'doorlopende ' : ''}projecten deze maand.</div>`;
+  }).join('') : `<div class="state-msg" style="padding:20px;">Geen ${planningSubTab === 'doorlopend' ? 'doorlopende ' : (planningSubTab === 'podcast' ? 'podcast-' : '')}projecten deze maand.</div>`;
 
   const monthLabel = anchor.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' });
   container.innerHTML = `
@@ -817,6 +821,7 @@ function renderPlanningView(containerId, projects) {
     <div class="tl-zoom" style="margin-bottom:10px;display:inline-flex;">
       <button data-subtab="actief" class="${planningSubTab==='actief'?'active':''}">Actief</button>
       <button data-subtab="doorlopend" class="${planningSubTab==='doorlopend'?'active':''}">Doorlopend</button>
+      <button data-subtab="podcast" class="${planningSubTab==='podcast'?'active':''}">Podcast</button>
     </div>
     <div class="timeline">
       <div class="plan-daynums">${dayNumsHtml}</div>
