@@ -169,9 +169,10 @@ button:disabled { opacity: 0.5; cursor: default; }
 .file-list { display: flex; flex-direction: column; }
 .file-row { padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: 13px; display: flex; align-items: center; gap: 8px; }
 .file-row:last-child { border-bottom: none; }
-.file-row-main { flex: 1; min-width: 0; }
-.file-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; color: var(--accent); }
-.file-row-name:hover { text-decoration: underline; }
+.file-row-main { flex: 1; min-width: 0; cursor: pointer; }
+.file-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); font-weight: 600; }
+.file-row-main:hover .file-row-name { text-decoration: underline; }
+.file-row-original { font-size: 10px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
 .file-row-meta { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
 .file-row-delete { border: none; background: transparent; color: var(--text-faint); font-size: 15px; padding: 2px 6px; cursor: pointer; flex-shrink: 0; }
 .file-row-delete:hover { color: var(--red); }
@@ -180,7 +181,6 @@ button:disabled { opacity: 0.5; cursor: default; }
 .file-drop-label { display: block; text-align: center; padding: 10px; border: 1.5px dashed var(--border); border-radius: 7px; font-size: 12px; color: var(--text-dim); cursor: pointer; }
 .file-drop-label:hover { border-color: var(--accent); color: var(--accent); }
 .file-drop-label.drag-active { border-color: var(--accent); color: var(--accent); background: rgba(59,111,224,0.06); }
-.file-label { display: inline-block; background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px; margin-right: 4px; text-transform: uppercase; letter-spacing: 0.03em; }
 .file-empty { padding: 20px 16px; text-align: center; color: var(--text-faint); font-size: 12px; }
 .track-head-left { display: flex; align-items: center; gap: 8px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -1225,13 +1225,15 @@ function filesColHtml(p, files) {
 function fileRowHtml(projectId, f) {
   const kb = f.size_bytes ? Math.round(f.size_bytes / 1024) : null;
   const meta = [f.uploaded_by ? memberName(f.uploaded_by) : null, kb ? (kb > 1024 ? Math.round(kb/1024*10)/10 + ' MB' : kb + ' KB') : null].filter(Boolean).join(' \u00b7 ');
+  const fileNameEsc = escapeHtml(f.file_name).replace(/'/g,"&#39;");
   return `
     <div class="file-row" data-file-id="${f.id}">
-      <div class="file-row-main">
-        <div class="file-row-name" onclick="openProjectFile('${escapeHtml(f.storage_path)}')" title="${escapeHtml(f.file_name)}">${f.label ? `<span class="file-label">${escapeHtml(f.label)}</span> ` : ''}${escapeHtml(f.file_name)}</div>
+      <div class="file-row-main" onclick="openProjectFile('${escapeHtml(f.storage_path)}','${fileNameEsc}')" title="Openen: ${escapeHtml(f.file_name)}">
+        <div class="file-row-name">${escapeHtml(f.label || f.file_name)}</div>
+        ${f.label ? `<div class="file-row-original">${escapeHtml(f.file_name)}</div>` : ''}
         ${meta ? `<div class="file-row-meta">${escapeHtml(meta)}</div>` : ''}
       </div>
-      <button class="file-row-delete" title="Verwijderen" onclick="deleteProjectFile('${f.id}','${escapeHtml(f.storage_path)}','${projectId}')">\u00d7</button>
+      <button class="file-row-delete" title="Verwijderen" onclick="event.stopPropagation(); deleteProjectFile('${f.id}','${escapeHtml(f.storage_path)}','${projectId}')">\u00d7</button>
     </div>`;
 }
 async function saveConcept(projectId) {
@@ -1312,11 +1314,20 @@ async function startFileUpload(projectId, file) {
     if (dropLabel && originalText) dropLabel.innerHTML = originalText;
   }
 }
-async function openProjectFile(storagePath) {
+function isNativelyViewable(fileName) {
+  const ext = (fileName.split('.').pop() || '').toLowerCase();
+  return ['pdf','png','jpg','jpeg','gif','webp','svg','txt','md','csv','json','mp4','mp3','wav'].includes(ext);
+}
+async function openProjectFile(storagePath, fileName) {
   try {
     const { data, error } = await authClient.storage.from('project-files').createSignedUrl(storagePath, 3600);
     if (error) throw error;
-    window.open(data.signedUrl, '_blank');
+    const url = data.signedUrl;
+    if (isNativelyViewable(fileName || storagePath)) {
+      window.open(url, '_blank');
+    } else {
+      window.open('https://docs.google.com/viewer?url=' + encodeURIComponent(url) + '&embedded=true', '_blank');
+    }
   } catch (e) {
     alert('Kon bestand niet openen: ' + e.message);
   }
