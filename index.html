@@ -139,6 +139,10 @@ button:disabled { opacity: 0.5; cursor: default; }
 .plan-label span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plan-track { flex: 1; position: relative; height: 14px; background: var(--bg); border-radius: 4px; }
 .plan-bar { position: absolute; top: 0; bottom: 0; border-radius: 4px; cursor: pointer; min-width: 4px; }
+.plan-row[draggable="true"] { cursor: grab; }
+.plan-row.dragging { opacity: 0.4; }
+.plan-row.drag-over { border-top: 2px solid var(--accent); }
+.plan-drag-handle { color: var(--text-faint); font-size: 11px; cursor: grab; flex-shrink: 0; }
 .tlcal-daynums { display: flex; margin-left: 112px; margin-bottom: 4px; }
 .tlcal-daynums span { flex: 1; text-align: center; font-size: 10px; color: var(--text-faint); font-family: var(--mono); }
 .tlcal-row { display: flex; align-items: center; gap: 10px; }
@@ -549,7 +553,8 @@ function closeModal() { document.getElementById('modalRoot').innerHTML = ''; }
 const COLOR_PALETTE = ['#3b6fe0','#d99a2a','#3f9d6d','#d9534f','#8a6fd9','#3aa7b9','#c05fd1','#5a8e3a'];
 
 // ================= Calendar (reused pattern) =================
-const calState = { anchor: new Date(), mode: 'maand' };
+const calState = { anchor: new Date(), mode: 'planning' };
+let planningSubTab = 'actief';
 function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
 function isSameDay(a, b) { return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
 function calItemOnclick(item) {
@@ -733,10 +738,14 @@ function renderPlanningView(containerId, projects) {
   const today = new Date();
   const todayInMonth = today.getFullYear()===anchor.getFullYear() && today.getMonth()===anchor.getMonth();
 
-  const rows = projects.map(p => {
+  const tabProjects = projects.filter(p => (p.status === 'ongoing') === (planningSubTab === 'doorlopend'));
+
+  let rows = tabProjects.map(p => {
     const range = computeBarRange(p, monthStart, monthEnd);
     return range ? { p, range } : null;
   }).filter(Boolean);
+  const isMod = currentIsModerator();
+  rows.sort((a, b) => (parseProjectMeta(a.p).order || 0) - (parseProjectMeta(b.p).order || 0) || a.range.startDay - b.range.startDay);
 
   const dayNumsHtml = Array.from({ length: daysInMonth }, (_, i) => {
     const isToday = todayInMonth && (i + 1) === today.getDate();
@@ -747,13 +756,13 @@ function renderPlanningView(containerId, projects) {
     const color = getEffectiveColor(p);
     const left = ((range.startDay - 1) / daysInMonth) * 100;
     const width = Math.max(((range.endDay - range.startDay + 1) / daysInMonth) * 100, (1 / daysInMonth) * 100);
-    return `<div class="plan-row">
-        <div class="plan-label"><span class="dot" style="background:${color}"></span><span>${p.external ? '\u{1F517} ' : ''}${escapeHtml(p.name)}</span></div>
+    return `<div class="plan-row" data-project-id="${p.id}" ${(isMod && !p.external) ? 'draggable="true"' : ''}>
+        <div class="plan-label">${(isMod && !p.external) ? '<span class="plan-drag-handle" title="Verslepen">\u2630</span>' : ''}<span class="dot" style="background:${color}"></span><span>${p.external ? '\u{1F517} ' : ''}${escapeHtml(p.name)}</span></div>
         <div class="plan-track">
           <div class="plan-bar" style="left:${left}%;width:${width}%;${range.isOngoing ? `background:repeating-linear-gradient(90deg, ${color} 0 6px, ${color}99 6px 10px);` : `background:${color};`}" onclick="${calItemOnclick(p)}" title="${escapeHtml(p.name)}"></div>
         </div>
       </div>`;
-  }).join('') : '<div class="state-msg" style="padding:20px;">Geen projecten deze maand.</div>';
+  }).join('') : `<div class="state-msg" style="padding:20px;">Geen ${planningSubTab === 'doorlopend' ? 'doorlopende ' : ''}projecten deze maand.</div>`;
 
   const monthLabel = anchor.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' });
   container.innerHTML = `
@@ -761,12 +770,52 @@ function renderPlanningView(containerId, projects) {
       <div class="cal-title">${monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}</div>
       <div class="cal-nav">${calModeToggleHtml()}<button class="icon" id="calPrev">\u2190</button><button class="small" id="calToday">Vandaag</button><button class="icon" id="calNext">\u2192</button></div>
     </div>
+    <div class="tl-zoom" style="margin-bottom:10px;display:inline-flex;">
+      <button data-subtab="actief" class="${planningSubTab==='actief'?'active':''}">Actief</button>
+      <button data-subtab="doorlopend" class="${planningSubTab==='doorlopend'?'active':''}">Doorlopend</button>
+    </div>
     <div class="timeline">
       <div class="plan-daynums">${dayNumsHtml}</div>
-      <div class="plan-rows">${rowsHtml}</div>
+      <div class="plan-rows" id="planRows">${rowsHtml}</div>
     </div>
   `;
+  document.querySelectorAll('[data-subtab]').forEach(btn => {
+    btn.onclick = () => { planningSubTab = btn.dataset.subtab; renderPlanningView(containerId, projects); };
+  });
   wireCalControls(containerId, projects);
+  if (isMod) setupPlanningDragDrop(document.getElementById('planRows'), tabProjects);
+}
+function setupPlanningDragDrop(rowsEl, tabProjects) {
+  if (!rowsEl) return;
+  let draggedId = null;
+  rowsEl.querySelectorAll('.plan-row[draggable="true"]').forEach(row => {
+    row.addEventListener('dragstart', () => { draggedId = row.dataset.projectId; row.classList.add('dragging'); });
+    row.addEventListener('dragend', () => { row.classList.remove('dragging'); rowsEl.querySelectorAll('.plan-row').forEach(r => r.classList.remove('drag-over')); });
+    row.addEventListener('dragover', (e) => { e.preventDefault(); row.classList.add('drag-over'); });
+    row.addEventListener('dragleave', () => { row.classList.remove('drag-over'); });
+    row.addEventListener('drop', async (e) => {
+      e.preventDefault(); row.classList.remove('drag-over');
+      const targetId = row.dataset.projectId;
+      if (!draggedId || draggedId === targetId) return;
+      const rowsArr = Array.from(rowsEl.querySelectorAll('.plan-row'));
+      const draggedEl = rowsArr.find(r => r.dataset.projectId === draggedId);
+      if (!draggedEl) return;
+      const targetIdx = rowsArr.indexOf(row);
+      rowsEl.insertBefore(draggedEl, rowsArr.indexOf(draggedEl) < targetIdx ? row.nextSibling : row);
+      const orderedIds = Array.from(rowsEl.querySelectorAll('.plan-row')).map(r => r.dataset.projectId);
+      try {
+        for (let i = 0; i < orderedIds.length; i++) {
+          const pid = orderedIds[i];
+          const proj = tabProjects.find(p => p.id === pid);
+          if (!proj) continue;
+          const meta = parseProjectMeta(proj);
+          meta.order = i;
+          await sbUpdate('team_projects', 'id=eq.' + pid, { extra_track_name: stringifyProjectMeta(meta) });
+          proj.extra_track_name = stringifyProjectMeta(meta);
+        }
+      } catch (err) { alert('Herordenen mislukt: ' + err.message); }
+    });
+  });
 }
 
 function renderProjectList(containerId, projects, title) {
@@ -999,6 +1048,7 @@ function editProjectModal(project) {
 }
 
 // ================= Project detail =================
+let curProjectId = null, curProject = null, curSteps = [], curIsShared = false;
 async function openProject(projectId, isShared, fromHistory) {
   if (!fromHistory) {
     const params = new URLSearchParams(window.location.search);
@@ -1022,6 +1072,7 @@ async function openProject(projectId, isShared, fromHistory) {
     return;
   }
   if (!p) { view.innerHTML = '<div class="state-msg">Project niet gevonden.</div>'; return; }
+  curProjectId = projectId; curProject = p; curSteps = steps; curIsShared = !!isShared;
 
   const cd = countdownLabel(p.launch_date);
   const takenSteps = steps.filter(s => (s.track || 'taken') === 'taken');
@@ -1060,14 +1111,17 @@ async function openProject(projectId, isShared, fromHistory) {
     extraTracks.forEach(t => setupDragDrop(document.getElementById('steplist_' + t.id)));
   }
 }
-function parseExtraTracks(p) {
-  if (!p.extra_track_name) return [];
+function parseProjectMeta(p) {
+  if (!p.extra_track_name) return { tracks: [], order: 0 };
   try {
-    const arr = JSON.parse(p.extra_track_name);
-    if (Array.isArray(arr)) return arr;
+    const parsed = JSON.parse(p.extra_track_name);
+    if (Array.isArray(parsed)) return { tracks: parsed, order: 0 };
+    if (parsed && typeof parsed === 'object') return { tracks: parsed.tracks || [], order: parsed.order || 0 };
   } catch (e) {}
-  return [{ id: 'extra', name: p.extra_track_name }];
+  return { tracks: [{ id: 'extra', name: p.extra_track_name }], order: 0 };
 }
+function stringifyProjectMeta(meta) { return JSON.stringify({ tracks: meta.tracks || [], order: meta.order || 0 }); }
+function parseExtraTracks(p) { return parseProjectMeta(p).tracks; }
 function trackColHtml(p, trackKey, label, trackSteps, isShared, removable, showAddBtn) {
   return `
       <div class="track-col">
@@ -1126,9 +1180,9 @@ async function addTrackUI(projectId) {
   if (!name || !name.trim()) return;
   try {
     const p = await sbSelect('team_projects', 'id=eq.' + projectId + '&select=extra_track_name').then(r => r[0]);
-    const tracks = parseExtraTracks(p);
-    tracks.push({ id: uid('trk'), name: name.trim() });
-    await sbUpdate('team_projects', 'id=eq.' + projectId, { extra_track_name: JSON.stringify(tracks) });
+    const meta = parseProjectMeta(p);
+    meta.tracks.push({ id: uid('trk'), name: name.trim() });
+    await sbUpdate('team_projects', 'id=eq.' + projectId, { extra_track_name: stringifyProjectMeta(meta) });
     refreshProjectView(projectId);
   } catch (e) { alert('Opslaan mislukt: ' + e.message); }
 }
@@ -1137,9 +1191,10 @@ async function removeTrackUI(projectId, trackId) {
   if (!confirm('Deze lijst en alle taken erin verwijderen?')) return;
   try {
     const p = await sbSelect('team_projects', 'id=eq.' + projectId + '&select=extra_track_name').then(r => r[0]);
-    const tracks = parseExtraTracks(p).filter(t => t.id !== trackId);
+    const meta = parseProjectMeta(p);
+    meta.tracks = meta.tracks.filter(t => t.id !== trackId);
     await sbDelete('team_project_steps', 'project_id=eq.' + projectId + '&track=eq.' + trackId);
-    await sbUpdate('team_projects', 'id=eq.' + projectId, { extra_track_name: tracks.length ? JSON.stringify(tracks) : null });
+    await sbUpdate('team_projects', 'id=eq.' + projectId, { extra_track_name: (meta.tracks.length || meta.order) ? stringifyProjectMeta(meta) : null });
     refreshProjectView(projectId);
   } catch (e) { alert('Verwijderen mislukt: ' + e.message); }
 }
@@ -1296,8 +1351,8 @@ function stepHtml(projectId, s, readOnly, ownerEmail) {
         ${s.url ? `<div class="step-url"><a href="${escapeHtml(s.url)}" target="_blank" rel="noopener">\u{1F517} ${escapeHtml(s.url.replace(/^https?:\/\//,''))}</a></div>` : ''}
       </div>
       ${readOnly ? '' : `
-      <button class="prio-flag prio-${prio||'none'}" title="Prioriteit instellen" onclick="cyclePriority('${projectId}','${s.id}','${prio}')">\u2691</button>
       <div class="step-actions">
+        <button class="prio-flag prio-${prio||'none'}" title="Prioriteit instellen" onclick="cyclePriority('${projectId}','${s.id}','${prio}')">\u2691</button>
         <button title="Toewijzen" onclick="assignStepUI('${projectId}','${s.id}','${escapeHtml(s.assignee_email||'').replace(/'/g,"&#39;")}','${escapeHtml(ownerEmail||'').replace(/'/g,"&#39;")}')">\u{1F464}</button>
         <button title="Deadline" onclick="setStepDeadlineUI('${projectId}','${s.id}','${escapeHtml(isoToDutch(s.due_date))}')">\u{1F4C5}</button>
         <button title="URL" onclick="setStepUrlUI('${projectId}','${s.id}','${escapeHtml(s.url||'').replace(/'/g,"&#39;")}')">\u{1F517}</button>
@@ -1309,6 +1364,18 @@ function stepHtml(projectId, s, readOnly, ownerEmail) {
   `;
 }
 
+function rerenderTrack(trackKey) {
+  const listEl = document.getElementById('steplist_' + trackKey);
+  if (!listEl || !curProject) return;
+  const trackSteps = curSteps.filter(s => (s.track || 'taken') === trackKey);
+  listEl.innerHTML = sortForDisplay(trackSteps).map(s => stepHtml(curProjectId, s, curIsShared, curProject.owner_email)).join('');
+  if (!curIsShared) setupDragDrop(listEl);
+  renderDetailTimeline(curProject, curSteps);
+}
+function stepTrackOf(stepId) {
+  const s = curSteps.find(x => x.id === stepId);
+  return s ? (s.track || 'taken') : 'taken';
+}
 async function addStepUI(projectId, track) {
   if (!requireLogin()) return;
   track = track || 'taken';
@@ -1316,8 +1383,11 @@ async function addStepUI(projectId, track) {
   const text = input.value.trim();
   if (!text) return;
   input.value = '';
-  try { await addStep(projectId, text, track); refreshProjectView(projectId); }
-  catch (err) { alert('Kon taak niet toevoegen: ' + err.message); }
+  try {
+    const newStep = await addStep(projectId, text, track);
+    curSteps.push(newStep);
+    rerenderTrack(track);
+  } catch (err) { alert('Kon taak niet toevoegen: ' + err.message); }
 }
 async function addStep(projectId, stepName, track) {
   if (!requireLogin()) return;
@@ -1331,14 +1401,28 @@ function refreshProjectView(projectId) { openProject(projectId); }
 
 async function toggleStep(projectId, stepId, currentlyDone) {
   if (!requireLogin()) return;
-  await sbUpdate('team_project_steps', 'id=eq.' + stepId, { status: currentlyDone ? 'pending' : 'done' });
-  refreshProjectView(projectId);
+  const newStatus = currentlyDone ? 'pending' : 'done';
+  const track = stepTrackOf(stepId);
+  try {
+    await sbUpdate('team_project_steps', 'id=eq.' + stepId, { status: newStatus });
+    const s = curSteps.find(x => x.id === stepId); if (s) s.status = newStatus;
+    rerenderTrack(track);
+  } catch (e) { alert('Opslaan mislukt: ' + e.message); }
 }
 async function deleteStepUI(projectId, stepId) {
   if (!requireLogin()) return;
   if (!confirm('Deze taak verwijderen?')) return;
-  await sbDelete('team_project_steps', 'id=eq.' + stepId);
-  refreshProjectView(projectId);
+  const track = stepTrackOf(stepId);
+  const el = document.querySelector(`[data-step-id="${stepId}"]`);
+  if (el) el.classList.add('fading');
+  try {
+    await sbDelete('team_project_steps', 'id=eq.' + stepId);
+    curSteps = curSteps.filter(s => s.id !== stepId);
+    setTimeout(() => rerenderTrack(track), 200);
+  } catch (e) {
+    alert('Verwijderen mislukt: ' + e.message);
+    if (el) el.classList.remove('fading');
+  }
 }
 function startRenameStep(stepId) {
   if (!requireLogin()) return;
@@ -1348,7 +1432,12 @@ function startRenameStep(stepId) {
   el.onblur = async () => {
     el.contentEditable = 'false';
     const newName = el.textContent.trim();
-    if (newName) { try { await sbUpdate('team_project_steps', 'id=eq.' + stepId, { step_name: newName }); } catch (e) { alert('Opslaan mislukt: ' + e.message); } }
+    if (newName) {
+      try {
+        await sbUpdate('team_project_steps', 'id=eq.' + stepId, { step_name: newName });
+        const s = curSteps.find(x => x.id === stepId); if (s) s.step_name = newName;
+      } catch (e) { alert('Opslaan mislukt: ' + e.message); }
+    }
   };
   el.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } };
 }
@@ -1356,10 +1445,15 @@ function startEditNote(stepId) {
   if (!requireLogin()) return;
   const note = prompt('Notitie:');
   if (note === null) return;
-  sbUpdate('team_project_steps', 'id=eq.' + stepId, { note }).then(() => location.reload()).catch(e => alert('Opslaan mislukt: ' + e.message));
+  const track = stepTrackOf(stepId);
+  sbUpdate('team_project_steps', 'id=eq.' + stepId, { note }).then(() => {
+    const s = curSteps.find(x => x.id === stepId); if (s) s.note = note;
+    rerenderTrack(track);
+  }).catch(e => alert('Opslaan mislukt: ' + e.message));
 }
 function setStepDeadlineUI(projectId, stepId, currentDutch) {
   if (!requireLogin()) return;
+  const track = stepTrackOf(stepId);
   renderModal(`
     <h2>Deadline instellen</h2>
     ${dateFieldHtml('stepDeadline', 'Deadline', currentDutch || '')}
@@ -1367,7 +1461,11 @@ function setStepDeadlineUI(projectId, stepId, currentDutch) {
   `);
   document.getElementById('modalCancel').onclick = closeModal;
   document.getElementById('modalClear').onclick = async () => {
-    try { await sbUpdate('team_project_steps', 'id=eq.' + stepId, { due_date: null }); closeModal(); refreshProjectView(projectId); }
+    try {
+      await sbUpdate('team_project_steps', 'id=eq.' + stepId, { due_date: null });
+      const s = curSteps.find(x => x.id === stepId); if (s) s.due_date = null;
+      closeModal(); rerenderTrack(track);
+    }
     catch (e) { alert('Opslaan mislukt: ' + e.message); }
   };
   document.getElementById('modalSave').onclick = async () => {
@@ -1377,9 +1475,11 @@ function setStepDeadlineUI(projectId, stepId, currentDutch) {
     const btn = document.getElementById('modalSave');
     btn.disabled = true; btn.textContent = 'Bezig\u2026';
     try {
-      await sbUpdate('team_project_steps', 'id=eq.' + stepId, { due_date: d ? toIso(d) : null });
+      const iso = d ? toIso(d) : null;
+      await sbUpdate('team_project_steps', 'id=eq.' + stepId, { due_date: iso });
+      const s = curSteps.find(x => x.id === stepId); if (s) s.due_date = iso;
       closeModal();
-      refreshProjectView(projectId);
+      rerenderTrack(track);
     } catch (e) {
       alert('Opslaan mislukt: ' + e.message);
       btn.disabled = false; btn.textContent = 'Opslaan';
@@ -1388,6 +1488,7 @@ function setStepDeadlineUI(projectId, stepId, currentDutch) {
 }
 function setStepUrlUI(projectId, stepId, currentUrl) {
   if (!requireLogin()) return;
+  const track = stepTrackOf(stepId);
   renderModal(`
     <h2>URL toevoegen</h2>
     <div class="field"><label>URL</label><input type="text" id="stepUrl" placeholder="https://..." value="${escapeHtml(currentUrl || '')}"></div>
@@ -1395,7 +1496,11 @@ function setStepUrlUI(projectId, stepId, currentUrl) {
   `);
   document.getElementById('modalCancel').onclick = closeModal;
   document.getElementById('modalClear').onclick = async () => {
-    try { await sbUpdate('team_project_steps', 'id=eq.' + stepId, { url: null }); closeModal(); refreshProjectView(projectId); }
+    try {
+      await sbUpdate('team_project_steps', 'id=eq.' + stepId, { url: null });
+      const s = curSteps.find(x => x.id === stepId); if (s) s.url = null;
+      closeModal(); rerenderTrack(track);
+    }
     catch (e) { alert('Opslaan mislukt: ' + e.message); }
   };
   document.getElementById('modalSave').onclick = async () => {
@@ -1405,8 +1510,9 @@ function setStepUrlUI(projectId, stepId, currentUrl) {
     btn.disabled = true; btn.textContent = 'Bezig\u2026';
     try {
       await sbUpdate('team_project_steps', 'id=eq.' + stepId, { url: url || null });
+      const s = curSteps.find(x => x.id === stepId); if (s) s.url = url || null;
       closeModal();
-      refreshProjectView(projectId);
+      rerenderTrack(track);
     } catch (e) {
       alert('Opslaan mislukt: ' + e.message);
       btn.disabled = false; btn.textContent = 'Opslaan';
@@ -1418,6 +1524,7 @@ async function cyclePriority(projectId, stepId, current) {
   const order = ['', 'rood', 'oranje', 'groen'];
   const next = order[(order.indexOf(current) + 1) % order.length];
   await sbUpdate('team_project_steps', 'id=eq.' + stepId, { priority: next || null });
+  const s = curSteps.find(x => x.id === stepId); if (s) s.priority = next || null;
   const stepEl = document.querySelector(`[data-step-id="${stepId}"]`);
   if (stepEl) {
     ['prio-none','prio-rood','prio-oranje','prio-groen'].forEach(c => stepEl.classList.remove(c));
@@ -1432,6 +1539,7 @@ async function cyclePriority(projectId, stepId, current) {
 }
 function assignStepUI(projectId, stepId, currentEmail, ownerEmail) {
   if (!requireLogin()) return;
+  const track = stepTrackOf(stepId);
   renderModal(`
     <h2>Taak toewijzen</h2>
     <div class="field"><label>Toegewezen aan</label>
@@ -1449,9 +1557,10 @@ function assignStepUI(projectId, stepId, currentEmail, ownerEmail) {
     btn.disabled = true; btn.textContent = 'Bezig\u2026';
     try {
       await sbUpdate('team_project_steps', 'id=eq.' + stepId, { assignee_email: email || null });
+      const s = curSteps.find(x => x.id === stepId); if (s) s.assignee_email = email || null;
       if (email && email !== ownerEmail) notifyAssignment(projectId, stepId, email, currentUserEmail);
       closeModal();
-      refreshProjectView(projectId);
+      rerenderTrack(track);
     } catch (e) {
       alert('Toewijzen mislukt: ' + e.message);
       btn.disabled = false; btn.textContent = 'Opslaan';
@@ -1499,9 +1608,11 @@ function setupDragDrop(listEl) {
     const orderedIds = Array.from(listEl.querySelectorAll('.step')).map(s => s.dataset.stepId);
     const projectId = listEl.dataset.project;
     try {
-      for (let i = 0; i < orderedIds.length; i++) await sbUpdate('team_project_steps', 'id=eq.' + orderedIds[i], { order_num: i+1 });
-      refreshProjectView(projectId);
-    } catch (err) { alert('Herordenen mislukt: ' + err.message); refreshProjectView(projectId); }
+      for (let i = 0; i < orderedIds.length; i++) {
+        await sbUpdate('team_project_steps', 'id=eq.' + orderedIds[i], { order_num: i+1 });
+        const s = curSteps.find(x => x.id === orderedIds[i]); if (s) s.order_num = i+1;
+      }
+    } catch (err) { alert('Herordenen mislukt: ' + err.message); rerenderTrack(listEl.dataset.track); }
   });
 }
 
