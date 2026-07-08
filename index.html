@@ -161,7 +161,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .tracks-files { width: 280px; flex-shrink: 0; }
 .track-col { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; }
 .track-head { padding: 12px 16px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.add-track-btn { border: 1.5px dashed var(--border); background: transparent; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; color: var(--text-faint); font-size: 13px; line-height: 1; cursor: pointer; flex-shrink: 0; }
+.add-track-btn { border: 1.5px dashed var(--border); background: transparent; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; color: var(--text-faint); font-size: 14px; line-height: 1; cursor: pointer; flex-shrink: 0; margin-top: 8px; }
 .add-track-btn:hover { border-color: var(--accent); color: var(--accent); }
 .file-list { display: flex; flex-direction: column; }
 .file-row { padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: 13px; display: flex; align-items: center; gap: 8px; }
@@ -280,6 +280,22 @@ const RMN_TOOL_URL = 'https://oxzdddxjcqmhwsxiupic.supabase.co';
 const RMN_TOOL_KEY = 'sb_publishable_SpubcyCBwiZaZyjoA-LiCw_276Kf1rJ';
 const RMN_TOOL_SITE = 'https://project-dashboard-rmn.netlify.app';
 const RMN_TOOL_OWNER_EMAIL = 'dorus.vanmosselveld@roularta.nl';
+const RMN_ORDER_PATH = '_settings/rmn-order.json';
+async function loadRmnOrder() {
+  try {
+    const { data, error } = await authClient.storage.from('project-files').download(RMN_ORDER_PATH);
+    if (error) throw error;
+    return JSON.parse(await data.text());
+  } catch (e) { return {}; }
+}
+async function saveRmnOrder(orderMap) {
+  const blob = new Blob([JSON.stringify(orderMap)], { type: 'application/json' });
+  await authClient.storage.from('project-files').upload(RMN_ORDER_PATH, blob, { upsert: true });
+}
+function getProjectOrder(p) {
+  if (p.external) return p.__order || 0;
+  return parseProjectMeta(p).order || 0;
+}
 async function loadRmnProjects() {
   try {
     const res = await fetch(RMN_TOOL_URL + '/rest/v1/projects?is_show_project=eq.false&select=id,name,status,color,start_date,launch_date&order=created_at.desc&limit=50', {
@@ -287,11 +303,14 @@ async function loadRmnProjects() {
     });
     if (!res.ok) throw new Error('kon niet laden');
     const rows = await res.json();
-    return rows.map(p => ({
+    const mapped = rows.map(p => ({
       id: 'rmn_' + p.id, name: p.name, status: p.status === 'live' ? 'ongoing' : p.status,
       color: memberColor(RMN_TOOL_OWNER_EMAIL), start_date: p.start_date, launch_date: p.status === 'live' ? null : p.launch_date,
       owner_email: RMN_TOOL_OWNER_EMAIL, external: true, url: RMN_TOOL_SITE + '/?project=' + encodeURIComponent(p.id)
     }));
+    const orderMap = isLoggedIn ? await loadRmnOrder() : {};
+    mapped.forEach(p => { p.__order = orderMap[p.id] || 0; });
+    return mapped;
   } catch (e) { return []; }
 }
 
@@ -745,7 +764,7 @@ function renderPlanningView(containerId, projects) {
     return range ? { p, range } : null;
   }).filter(Boolean);
   const isMod = currentIsModerator();
-  rows.sort((a, b) => (parseProjectMeta(a.p).order || 0) - (parseProjectMeta(b.p).order || 0) || a.range.startDay - b.range.startDay);
+  rows.sort((a, b) => getProjectOrder(a.p) - getProjectOrder(b.p) || a.range.startDay - b.range.startDay);
 
   const dayNumsHtml = Array.from({ length: daysInMonth }, (_, i) => {
     const isToday = todayInMonth && (i + 1) === today.getDate();
@@ -756,8 +775,8 @@ function renderPlanningView(containerId, projects) {
     const color = getEffectiveColor(p);
     const left = ((range.startDay - 1) / daysInMonth) * 100;
     const width = Math.max(((range.endDay - range.startDay + 1) / daysInMonth) * 100, (1 / daysInMonth) * 100);
-    return `<div class="plan-row" data-project-id="${p.id}" ${(isMod && !p.external) ? 'draggable="true"' : ''}>
-        <div class="plan-label">${(isMod && !p.external) ? '<span class="plan-drag-handle" title="Verslepen">\u2630</span>' : ''}<span class="dot" style="background:${color}"></span><span>${p.external ? '\u{1F517} ' : ''}${escapeHtml(p.name)}</span></div>
+    return `<div class="plan-row" data-project-id="${p.id}" ${isMod ? 'draggable="true"' : ''}>
+        <div class="plan-label">${isMod ? '<span class="plan-drag-handle" title="Verslepen">\u2630</span>' : ''}<span class="dot" style="background:${color}"></span><span>${p.external ? '\u{1F517} ' : ''}${escapeHtml(p.name)}</span></div>
         <div class="plan-track">
           <div class="plan-bar" style="left:${left}%;width:${width}%;${range.isOngoing ? `background:repeating-linear-gradient(90deg, ${color} 0 6px, ${color}99 6px 10px);` : `background:${color};`}" onclick="${calItemOnclick(p)}" title="${escapeHtml(p.name)}"></div>
         </div>
@@ -804,15 +823,23 @@ function setupPlanningDragDrop(rowsEl, tabProjects) {
       rowsEl.insertBefore(draggedEl, rowsArr.indexOf(draggedEl) < targetIdx ? row.nextSibling : row);
       const orderedIds = Array.from(rowsEl.querySelectorAll('.plan-row')).map(r => r.dataset.projectId);
       try {
+        let rmnOrderMap = null;
         for (let i = 0; i < orderedIds.length; i++) {
           const pid = orderedIds[i];
           const proj = tabProjects.find(p => p.id === pid);
           if (!proj) continue;
-          const meta = parseProjectMeta(proj);
-          meta.order = i;
-          await sbUpdate('team_projects', 'id=eq.' + pid, { extra_track_name: stringifyProjectMeta(meta) });
-          proj.extra_track_name = stringifyProjectMeta(meta);
+          if (proj.external) {
+            if (!rmnOrderMap) rmnOrderMap = await loadRmnOrder();
+            rmnOrderMap[pid] = i;
+            proj.__order = i;
+          } else {
+            const meta = parseProjectMeta(proj);
+            meta.order = i;
+            await sbUpdate('team_projects', 'id=eq.' + pid, { extra_track_name: stringifyProjectMeta(meta) });
+            proj.extra_track_name = stringifyProjectMeta(meta);
+          }
         }
+        if (rmnOrderMap) await saveRmnOrder(rmnOrderMap);
       } catch (err) { alert('Herordenen mislukt: ' + err.message); }
     });
   });
@@ -1099,9 +1126,10 @@ async function openProject(projectId, isShared, fromHistory) {
     </div>
     <div class="tracks">
       <div class="tracks-lists">
-        ${extraTracks.length ? trackColHtml(p, 'taken', "To-do's", takenSteps, isShared, false, false) : trackColHtml(p, 'taken', "To-do's", takenSteps, isShared, false, true)}
-        ${extraTracks.map((t, i) => trackColHtml(p, t.id, t.name, steps.filter(s => s.track === t.id), isShared, true, i === extraTracks.length - 1)).join('')}
+        ${trackColHtml(p, 'taken', "To-do's", takenSteps, isShared, false)}
+        ${extraTracks.map(t => trackColHtml(p, t.id, t.name, steps.filter(s => s.track === t.id), isShared, true)).join('')}
       </div>
+      ${isShared ? '' : `<button class="add-track-btn" title="Extra lijst toevoegen" onclick="addTrackUI('${p.id}')">+</button>`}
       ${isShared ? '' : `<div class="tracks-files">${filesColHtml(p, files || [])}</div>`}
     </div>
   `;
@@ -1122,10 +1150,10 @@ function parseProjectMeta(p) {
 }
 function stringifyProjectMeta(meta) { return JSON.stringify({ tracks: meta.tracks || [], order: meta.order || 0 }); }
 function parseExtraTracks(p) { return parseProjectMeta(p).tracks; }
-function trackColHtml(p, trackKey, label, trackSteps, isShared, removable, showAddBtn) {
+function trackColHtml(p, trackKey, label, trackSteps, isShared, removable) {
   return `
       <div class="track-col">
-        <div class="track-head"><div class="track-head-left"><span class="dot" style="background:${p.color}"></span>${escapeHtml(label)}</div><div style="display:flex;align-items:center;gap:2px;">${(showAddBtn && !isShared) ? `<button class="add-track-btn" title="Extra lijst toevoegen" onclick="addTrackUI('${p.id}')">+</button>` : ''}${(removable && !isShared) ? `<button class="ghost" style="padding:2px 6px;font-size:13px;" title="Lijst verwijderen" onclick="removeTrackUI('${p.id}','${trackKey}')">\u00d7</button>` : ''}</div></div>
+        <div class="track-head"><div class="track-head-left"><span class="dot" style="background:${p.color}"></span>${escapeHtml(label)}</div>${(removable && !isShared) ? `<button class="ghost" style="padding:2px 6px;font-size:13px;" title="Lijst verwijderen" onclick="removeTrackUI('${p.id}','${trackKey}')">\u00d7</button>` : ''}</div>
         <div class="step-list" id="steplist_${trackKey}" data-track="${trackKey}" data-project="${p.id}">
           ${sortForDisplay(trackSteps).map(s => stepHtml(p.id, s, isShared, p.owner_email)).join('')}
         </div>
