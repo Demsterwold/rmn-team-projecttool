@@ -958,7 +958,7 @@ async function loadSidebarTodos(projects) {
       return;
     }
 
-    if (isLoggedIn) relevant = relevant.filter(s => s.assignee_email === currentUserEmail);
+    if (isLoggedIn) relevant = relevant.filter(s => (s.assignee_email || (projectMap[s.project_id] && projectMap[s.project_id].owner_email)) === currentUserEmail);
     __sidebarPersonalData = { relevant, projectMap };
     __sidebarPersonalTitle = title;
     renderPersonalSidebar(sidebar, title, relevant, projectMap);
@@ -988,15 +988,16 @@ function renderModeratorSidebar(sidebar, relevant, projectMap) {
     </div>`;
   };
   const groups = {};
-  const unassigned = [];
+  const trulyUnassigned = [];
   relevant.forEach(s => {
-    if (s.assignee_email) { (groups[s.assignee_email] = groups[s.assignee_email] || []).push(s); }
-    else unassigned.push(s);
+    const effectiveOwner = s.assignee_email || (projectMap[s.project_id] && projectMap[s.project_id].owner_email);
+    if (effectiveOwner) { (groups[effectiveOwner] = groups[effectiveOwner] || []).push(s); }
+    else trulyUnassigned.push(s);
   });
   const memberKeys = teamMembers.map(m => m.email).filter(e => groups[e] && groups[e].length);
-  if (!memberKeys.length && !unassigned.length) { sidebar.innerHTML = '<h3>Openstaande taken</h3><div class="state-msg" style="padding:20px;">Niets openstaand.</div>'; return; }
+  if (!memberKeys.length && !trulyUnassigned.length) { sidebar.innerHTML = '<h3>Openstaande taken</h3><div class="state-msg" style="padding:20px;">Niets openstaand.</div>'; return; }
   const rowsHtml = memberKeys.map(email => groupHtml(email, memberName(email), memberColor(email), groups[email])).join('');
-  const unassignedHtml = unassigned.length ? groupHtml('__unassigned', 'Niet toegewezen', '#9a9da6', unassigned) : '';
+  const unassignedHtml = trulyUnassigned.length ? groupHtml('__unassigned', 'Overig (geen eigenaar)', '#9a9da6', trulyUnassigned) : '';
   sidebar.innerHTML = `<h3>Openstaande taken</h3>${rowsHtml}${unassignedHtml}`;
 }
 function toggleMemberExpand(key) {
