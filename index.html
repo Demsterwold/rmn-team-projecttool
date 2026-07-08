@@ -138,7 +138,9 @@ button:disabled { opacity: 0.5; cursor: default; }
 .project-concept label { display: block; font-size: 11px; color: var(--text-faint); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.05em; }
 .project-concept textarea { width: 100%; min-height: 70px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); padding: 10px 12px; font-family: var(--sans); font-size: 13px; resize: vertical; }
 
-.tracks { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin: 24px 0 28px; max-width: 960px; align-items: start; }
+.tracks { display: flex; align-items: flex-start; gap: 16px; margin: 24px 0 28px; max-width: 1180px; }
+.tracks-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; flex: 1; min-width: 0; align-items: start; }
+.tracks-files { width: 280px; flex-shrink: 0; }
 .track-col { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; }
 .track-head { padding: 12px 16px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .add-track-btn { border: 1.5px dashed var(--border); background: transparent; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; color: var(--text-faint); font-size: 20px; line-height: 1; cursor: pointer; align-self: center; justify-self: center; }
@@ -219,7 +221,8 @@ button:disabled { opacity: 0.5; cursor: default; }
   header { flex-wrap: wrap; gap: 10px; }
   .home-grid { grid-template-columns: 1fr; }
   .cal-grid { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .tracks { max-width: 100%; }
+  .tracks { max-width: 100%; flex-direction: column; }
+  .tracks-files { width: 100%; }
 }
 </style>
 </head>
@@ -859,10 +862,12 @@ async function openProject(projectId, isShared, fromHistory) {
       <textarea id="conceptInput_${p.id}" placeholder="Waar gaat dit project over, en voor wie is het bedoeld?" ${isShared?'readonly':''} onblur="saveConcept('${p.id}')">${escapeHtml(p.concept || '')}</textarea>
     </div>
     <div class="tracks">
-      ${trackColHtml(p, 'taken', "To-do's", takenSteps, isShared, false)}
-      ${extraTracks.map(t => trackColHtml(p, t.id, t.name, steps.filter(s => s.track === t.id), isShared, true)).join('')}
-      ${isShared ? '' : `<button class="add-track-btn" title="Extra lijst toevoegen" onclick="addTrackUI('${p.id}')">+</button>`}
-      ${isShared ? '' : filesColHtml(p, files || [])}
+      <div class="tracks-lists">
+        ${trackColHtml(p, 'taken', "To-do's", takenSteps, isShared, false)}
+        ${extraTracks.map(t => trackColHtml(p, t.id, t.name, steps.filter(s => s.track === t.id), isShared, true)).join('')}
+        ${isShared ? '' : `<button class="add-track-btn" title="Extra lijst toevoegen" onclick="addTrackUI('${p.id}')">+</button>`}
+      </div>
+      ${isShared ? '' : `<div class="tracks-files">${filesColHtml(p, files || [])}</div>`}
     </div>
   `;
   renderDetailTimeline(p, steps);
