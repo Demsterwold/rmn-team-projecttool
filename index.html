@@ -47,7 +47,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); border-bottom: 1px solid var(--border); }
 .cal-weekdays div { padding: 8px; text-align: center; font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
 .cal-weeks { display: flex; flex-direction: column; }
-.cal-week-wrap { border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.cal-week-wrap { border-bottom: 1px solid var(--border); padding-bottom: 8px; }
 .cal-week-wrap:last-child { border-bottom: none; }
 .cal-daynum-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
 .cal-daynum-cell { border-right: 1px solid var(--border); padding: 6px 6px 0; }
@@ -55,8 +55,8 @@ button:disabled { opacity: 0.5; cursor: default; }
 .cal-daynum-cell.other-month { opacity: 0.35; }
 .cal-daynum { font-size: 12px; color: var(--text-dim); font-family: var(--mono); }
 .cal-daynum-cell.today .cal-daynum { background: var(--red); color: #fff; border-radius: 50%; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; }
-.cal-band-grid { display: grid; grid-template-columns: repeat(7, 1fr); margin-top: 3px; }
-.cal-band { grid-row: 1; font-size: 9px; padding: 1px 6px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; font-weight: 600; line-height: 1.3; }
+.cal-band-grid { display: grid; grid-template-columns: repeat(7, 1fr); margin-top: 4px; }
+.cal-band { grid-row: 1; height: 15px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff; overflow: hidden; }
 .cal-single-grid { display: grid; grid-template-columns: repeat(7, 1fr); margin-top: 2px; }
 .cal-single-cell { padding: 0 6px; display: flex; flex-direction: column; gap: 2px; }
 .cal-chip { font-size: 10px; padding: 2px 5px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; color: #fff; font-weight: 600; }
@@ -98,6 +98,10 @@ button:disabled { opacity: 0.5; cursor: default; }
 .proj-row .p-status { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 3px 8px; border-radius: 20px; white-space: nowrap; order: 6; }
 .status-in_productie { background: rgba(59,111,224,0.12); color: var(--accent); }
 .status-live { background: rgba(63,157,109,0.12); color: var(--green); }
+.status-ongoing { background: rgba(139,111,217,0.14); color: var(--c-taken); }
+.member-filter-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.member-chip { border: 1.5px solid var(--chip-color); background: var(--chip-color); color: #fff; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; cursor: pointer; transition: opacity 0.15s, background 0.15s, color 0.15s; }
+.member-chip.off { background: transparent; color: var(--text-faint); opacity: 0.6; }
 .status-archived { background: rgba(154,157,166,0.18); color: var(--text-faint); }
 .p-countdown { font-family: var(--mono); font-size: 12px; color: var(--text-dim); white-space: nowrap; order: 7; margin-left: auto; }
 .p-countdown.soon { color: var(--orange); font-weight: 700; }
@@ -125,6 +129,16 @@ button:disabled { opacity: 0.5; cursor: default; }
 .tl-nav { display: flex; align-items: center; gap: 8px; }
 .tl-nav .tl-label { font-size: 13px; font-family: var(--mono); color: var(--text-dim); min-width: 140px; text-align: center; }
 .timeline { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; padding: 14px 18px; }
+.plan-daynums { display: flex; margin-left: 148px; margin-bottom: 6px; }
+.plan-daynums span { flex: 1; text-align: center; font-size: 10px; color: var(--text-faint); font-family: var(--mono); }
+.plan-daynums span.today { color: var(--red); font-weight: 700; }
+.plan-rows { display: flex; flex-direction: column; }
+.plan-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.plan-row:last-child { border-bottom: none; }
+.plan-label { width: 138px; flex-shrink: 0; display: flex; align-items: center; gap: 6px; font-size: 12px; overflow: hidden; }
+.plan-label span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-track { flex: 1; position: relative; height: 14px; background: var(--bg); border-radius: 4px; }
+.plan-bar { position: absolute; top: 0; bottom: 0; border-radius: 4px; cursor: pointer; min-width: 4px; }
 .tlcal-daynums { display: flex; margin-left: 112px; margin-bottom: 4px; }
 .tlcal-daynums span { flex: 1; text-align: center; font-size: 10px; color: var(--text-faint); font-family: var(--mono); }
 .tlcal-row { display: flex; align-items: center; gap: 10px; }
@@ -143,7 +157,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .tracks-files { width: 280px; flex-shrink: 0; }
 .track-col { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; }
 .track-head { padding: 12px 16px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.add-track-btn { border: 1.5px dashed var(--border); background: transparent; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; color: var(--text-faint); font-size: 20px; line-height: 1; cursor: pointer; align-self: center; justify-self: center; }
+.add-track-btn { border: 1.5px dashed var(--border); background: transparent; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; color: var(--text-faint); font-size: 13px; line-height: 1; cursor: pointer; flex-shrink: 0; }
 .add-track-btn:hover { border-color: var(--accent); color: var(--accent); }
 .file-list { display: flex; flex-direction: column; }
 .file-row { padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: 13px; display: flex; align-items: center; gap: 8px; }
@@ -164,11 +178,10 @@ button:disabled { opacity: 0.5; cursor: default; }
 .track-head-left { display: flex; align-items: center; gap: 8px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .step-list { display: flex; flex-direction: column; }
-.step { padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: 13px; display: flex; align-items: flex-start; gap: 8px; cursor: grab; transition: opacity 0.22s ease, transform 0.22s ease; }
+.step { padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: 13px; display: flex; align-items: flex-start; gap: 8px; cursor: grab; transition: opacity 0.22s ease, transform 0.22s ease; position: relative; }
 .step:last-child { border-bottom: none; }
 .step.dragging { opacity: 0.4; }
 .step.drag-over { border-top: 2px solid var(--accent); }
-.step:hover .step-actions { opacity: 1; }
 .step.fading { opacity: 0 !important; transform: translateY(6px); }
 .step.prio-rood { box-shadow: inset 0 0 16px 1px rgba(217,83,79,0.4); background: rgba(217,83,79,0.05); }
 .step.prio-oranje { box-shadow: inset 0 0 16px 1px rgba(217,154,42,0.4); background: rgba(217,154,42,0.05); }
@@ -192,7 +205,8 @@ button:disabled { opacity: 0.5; cursor: default; }
 .prio-flag.prio-rood { color: var(--red); opacity: 1; }
 .prio-flag.prio-oranje { color: var(--orange); opacity: 1; }
 .prio-flag.prio-groen { color: var(--green); opacity: 1; }
-.step-actions { display: flex; gap: 0px; opacity: 0; transition: opacity 0.12s; flex-shrink: 0; }
+.step-actions { display: flex; gap: 0px; opacity: 0; transition: opacity 0.15s ease, transform 0.15s ease; position: absolute; right: 8px; top: 50%; transform: translateY(-50%) translateX(6px); background: var(--panel); border-radius: 8px; box-shadow: -10px 0 12px -4px rgba(0,0,0,0.08), 0 1px 5px rgba(0,0,0,0.1); padding: 2px 3px; pointer-events: none; }
+.step:hover .step-actions { opacity: 1; transform: translateY(-50%) translateX(0); pointer-events: auto; }
 .step-actions button { border: none; background: transparent; padding: 3px 4px; font-size: 11px; color: var(--text-faint); }
 .step-actions button:hover { color: var(--text); }
 .step-actions button.has-note { color: var(--accent); }
@@ -232,6 +246,7 @@ button:disabled { opacity: 0.5; cursor: default; }
     <h1 id="homeLink">Creative Studio <span>planning</span></h1>
     <div class="header-actions">
       <span class="user-badge" id="userBadge"></span>
+      <button class="ghost small hidden" id="viewPrefsBtn" title="Kies wie en welke kleuren je op je eigen kalender ziet">&#128065; Weergave</button>
       <button class="ghost small hidden" id="archiveBtn">&#128451; Archief</button>
       <button class="ghost small hidden" id="settingsBtn">&#9881; Team</button>
       <button class="ghost small" id="authBtn">Inloggen</button>
@@ -254,6 +269,96 @@ button:disabled { opacity: 0.5; cursor: default; }
 <script>
 const DEFAULT_URL = 'https://fvgifjyjuqddqtdegdxm.supabase.co';
 const DEFAULT_KEY = 'sb_publishable_G1ZS3ahLvSf-p_tdCBbjww_t4jVwD8u';
+// Alleen-lezen koppeling met de losstaande, persoonlijke RMN Projecttool.
+// Er wordt hier nooit naartoe geschreven, alleen gelezen (publieke, alleen-lezen data).
+// De projecten komen hiermee gewoon als extra items op de gedeelde kalender te staan.
+const RMN_TOOL_URL = 'https://oxzdddxjcqmhwsxiupic.supabase.co';
+const RMN_TOOL_KEY = 'sb_publishable_SpubcyCBwiZaZyjoA-LiCw_276Kf1rJ';
+const RMN_TOOL_SITE = 'https://project-dashboard-rmn.netlify.app';
+const RMN_TOOL_OWNER_EMAIL = 'dorus.vanmosselveld@roularta.nl';
+async function loadRmnProjects() {
+  try {
+    const res = await fetch(RMN_TOOL_URL + '/rest/v1/projects?is_show_project=eq.false&select=id,name,status,color,start_date,launch_date&order=created_at.desc&limit=50', {
+      headers: { apikey: RMN_TOOL_KEY, Authorization: 'Bearer ' + RMN_TOOL_KEY }
+    });
+    if (!res.ok) throw new Error('kon niet laden');
+    const rows = await res.json();
+    return rows.map(p => ({
+      id: 'rmn_' + p.id, name: p.name, status: p.status === 'live' ? 'ongoing' : p.status,
+      color: memberColor(RMN_TOOL_OWNER_EMAIL), start_date: p.start_date, launch_date: p.status === 'live' ? null : p.launch_date,
+      owner_email: RMN_TOOL_OWNER_EMAIL, external: true, url: RMN_TOOL_SITE + '/?project=' + encodeURIComponent(p.id)
+    }));
+  } catch (e) { return []; }
+}
+
+// ---- Persoonlijke weergavevoorkeuren (alleen lokaal, per teamlid, niet gedeeld) ----
+function getLocalPrefs() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('csp_view_prefs') || '{}');
+    return { hiddenOwners: raw.hiddenOwners || [], colorOverrides: raw.colorOverrides || {} };
+  } catch (e) { return { hiddenOwners: [], colorOverrides: {} }; }
+}
+function saveLocalPrefs(p) { localStorage.setItem('csp_view_prefs', JSON.stringify(p)); }
+function getEffectiveColor(p) {
+  if (!p.owner_email || currentIsModerator()) return p.color;
+  const prefs = getLocalPrefs();
+  return prefs.colorOverrides[p.owner_email] || p.color;
+}
+function isHiddenByPrefs(p) {
+  if (!p.owner_email) return false;
+  return getLocalPrefs().hiddenOwners.includes(p.owner_email);
+}
+let __viewPrefsTemp = null;
+function showViewPrefsModal() {
+  __viewPrefsTemp = getLocalPrefs();
+  renderViewPrefsModal();
+}
+function renderViewPrefsModal() {
+  const isMod = currentIsModerator();
+  renderModal(`
+    <h2>Mijn weergave</h2>
+    <div class="hint">Dit geldt alleen voor jouw eigen scherm \u2014 andere teamleden zien hier niets van.</div>
+    ${teamMembers.map(m => `
+      <div class="field" style="display:flex;align-items:center;gap:10px;">
+        <input type="checkbox" onchange="toggleVisPref('${m.email}', this.checked)" ${__viewPrefsTemp.hiddenOwners.includes(m.email)?'':'checked'} style="width:auto;">
+        <span class="color-swatch" style="background:${__viewPrefsTemp.colorOverrides[m.email]||m.color};width:18px;height:18px;flex-shrink:0;${isMod?'':'cursor:pointer;'}" title="${isMod?'':'Klik om kleur te wijzigen'}" ${isMod?'':`onclick="cyclePrefColor('${m.email}')"`}></span>
+        <span style="flex:1;font-size:13px;">${escapeHtml(m.name)}</span>
+      </div>
+    `).join('')}
+    <div class="modal-actions"><button class="ghost" id="modalCancel">Sluiten</button></div>
+  `);
+  document.getElementById('modalCancel').onclick = closeModal;
+}
+function toggleVisPref(email, visible) {
+  __viewPrefsTemp.hiddenOwners = __viewPrefsTemp.hiddenOwners.filter(e => e !== email);
+  if (!visible) __viewPrefsTemp.hiddenOwners.push(email);
+  saveLocalPrefs(__viewPrefsTemp);
+  loadHome();
+}
+function cyclePrefColor(email) {
+  const cur = __viewPrefsTemp.colorOverrides[email];
+  const idx = COLOR_PALETTE.indexOf(cur);
+  __viewPrefsTemp.colorOverrides[email] = COLOR_PALETTE[(idx + 1) % COLOR_PALETTE.length];
+  saveLocalPrefs(__viewPrefsTemp);
+  renderViewPrefsModal();
+  loadHome();
+}
+function memberFilterChipsHtml() {
+  if (!teamMembers.length) return '';
+  const prefs = getLocalPrefs();
+  return `<div class="member-filter-row">${teamMembers.map(m => {
+    const hidden = prefs.hiddenOwners.includes(m.email);
+    const color = prefs.colorOverrides[m.email] || m.color;
+    return `<button class="member-chip ${hidden?'off':''}" style="--chip-color:${color}" onclick="toggleMemberChip('${m.email}')">${escapeHtml(m.name)}</button>`;
+  }).join('')}</div>`;
+}
+function toggleMemberChip(email) {
+  const prefs = getLocalPrefs();
+  if (prefs.hiddenOwners.includes(email)) prefs.hiddenOwners = prefs.hiddenOwners.filter(e => e !== email);
+  else prefs.hiddenOwners.push(email);
+  saveLocalPrefs(prefs);
+  loadHome();
+}
 function getConfig() { return { url: DEFAULT_URL, key: DEFAULT_KEY }; }
 const authClient = window.supabase.createClient(DEFAULT_URL, DEFAULT_KEY);
 
@@ -327,6 +432,7 @@ function applyAuthState(session) {
   const badge = document.getElementById('userBadge');
   const settingsBtn = document.getElementById('settingsBtn');
   const archiveBtn = document.getElementById('archiveBtn');
+  const viewPrefsBtn = document.getElementById('viewPrefsBtn');
   if (isLoggedIn) {
     btn.textContent = 'Uitloggen';
     badge.textContent = currentUserEmail;
@@ -336,6 +442,7 @@ function applyAuthState(session) {
   }
   if (settingsBtn) settingsBtn.classList.toggle('hidden', !currentIsModerator());
   if (archiveBtn) archiveBtn.classList.toggle('hidden', !isLoggedIn);
+  if (viewPrefsBtn) viewPrefsBtn.classList.toggle('hidden', !isLoggedIn);
 }
 async function handleAuthClick() {
   if (isLoggedIn) {
@@ -370,7 +477,7 @@ function showLoginModal() {
 
 function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 function sortForDisplay(list) { return list.slice().sort((a,b) => (a.status==='done')-(b.status==='done') || a.order_num-b.order_num); }
-function statusLabel(s) { if (s === 'in_productie') return 'In productie'; if (s === 'live') return 'Live'; return s; }
+function statusLabel(s) { if (s === 'in_productie') return 'In productie'; if (s === 'live') return 'Live'; if (s === 'ongoing') return 'Doorlopend'; return s; }
 function uid(prefix) { return prefix + '_' + Date.now() + '_' + Math.floor(Math.random()*10000); }
 
 function parseDutchDate(str) {
@@ -445,12 +552,17 @@ const COLOR_PALETTE = ['#3b6fe0','#d99a2a','#3f9d6d','#d9534f','#8a6fd9','#3aa7b
 const calState = { anchor: new Date(), mode: 'maand' };
 function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
 function isSameDay(a, b) { return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+function calItemOnclick(item) {
+  if (item.external) return `window.open('${item.url}','_blank')`;
+  return `openProject('${item.id}')`;
+}
 function computeWeekBands(week, projects) {
   const candidates = [];
   projects.forEach(p => {
+    const isOngoing = p.status === 'ongoing';
     const start = p.start_date ? new Date(p.start_date) : null;
-    const launch = p.launch_date ? new Date(p.launch_date) : null;
-    if (!start || !launch || isSameDay(start, launch)) return;
+    const launch = isOngoing ? week[6] : (p.launch_date ? new Date(p.launch_date) : null);
+    if (!start || !launch || (!isOngoing && isSameDay(start, launch))) return;
     if (launch < week[0] || start > week[6]) return;
     const segStart = start < week[0] ? week[0] : start;
     const segEnd = launch > week[6] ? week[6] : launch;
@@ -458,9 +570,13 @@ function computeWeekBands(week, projects) {
     const colEnd = week.findIndex(d => isSameDay(d, segEnd));
     if (colStart === -1 || colEnd === -1) return;
     let label = p.name;
-    if (isSameDay(segStart, start)) label = '\u25B6 ' + label;
-    if (isSameDay(segEnd, launch)) label = label + ' \u{1F3C1}';
-    candidates.push({ colStart, colEnd, label, color: p.color, id: p.id });
+    if (!isOngoing) {
+      if (isSameDay(segStart, start)) label = '\u25B6 ' + label;
+      if (p.launch_date && isSameDay(segEnd, new Date(p.launch_date))) label = label + ' \u{1F3C1}';
+    }
+    if (p.external) label = '\u{1F517} ' + label;
+    const initial = p.name.trim().charAt(0).toUpperCase();
+    candidates.push({ colStart, colEnd, label, initial, color: getEffectiveColor(p), id: p.id, ongoing: isOngoing, external: !!p.external, url: p.url });
   });
   const rows = [];
   candidates.forEach(c => {
@@ -472,20 +588,23 @@ function computeWeekBands(week, projects) {
 function singleDayItemsForDay(day, projects) {
   const items = [];
   projects.forEach(p => {
+    if (p.status === 'ongoing') return;
     const start = p.start_date ? new Date(p.start_date) : null;
     const launch = p.launch_date ? new Date(p.launch_date) : null;
-    if (start && launch && isSameDay(start, launch) && isSameDay(day, start)) items.push({label: '\u25B6\u{1F3C1} ' + p.name, color: p.color, id: p.id});
-    else if (start && !launch && isSameDay(start, day)) items.push({label: '\u25B6 ' + p.name, color: p.color, id: p.id});
-    else if (launch && !start && isSameDay(launch, day)) items.push({label: '\u{1F3C1} ' + p.name, color: p.color, id: p.id});
+    const color = getEffectiveColor(p);
+    if (start && launch && isSameDay(start, launch) && isSameDay(day, start)) items.push({label: '\u25B6\u{1F3C1} ' + p.name, color, id: p.id, external: !!p.external, url: p.url});
+    else if (start && !launch && isSameDay(start, day)) items.push({label: '\u25B6 ' + p.name, color, id: p.id, external: !!p.external, url: p.url});
+    else if (launch && !start && isSameDay(launch, day)) items.push({label: '\u{1F3C1} ' + p.name, color, id: p.id, external: !!p.external, url: p.url});
   });
   return items;
 }
 function renderHomeCalendar(containerId, projects) {
   if (calState.mode === 'jaar') renderYearCalendar(containerId, projects);
+  else if (calState.mode === 'planning') renderPlanningView(containerId, projects);
   else renderMonthCalendar(containerId, projects);
 }
 function calModeToggleHtml() {
-  return `<div class="tl-zoom"><button data-mode="maand" class="${calState.mode==='maand'?'active':''}">Maand</button><button data-mode="jaar" class="${calState.mode==='jaar'?'active':''}">Jaar</button></div>`;
+  return `<div class="tl-zoom"><button data-mode="maand" class="${calState.mode==='maand'?'active':''}">Maand</button><button data-mode="jaar" class="${calState.mode==='jaar'?'active':''}">Jaar</button><button data-mode="planning" class="${calState.mode==='planning'?'active':''}">Planning</button></div>`;
 }
 function wireCalControls(containerId, projects) {
   document.querySelectorAll('[data-mode]').forEach(btn => {
@@ -512,7 +631,7 @@ function renderYearCalendar(containerId, projects) {
     const active = projects.filter(p => {
       const s = p.start_date ? new Date(p.start_date) : null;
       if (!s) return false;
-      const end = p.launch_date ? new Date(p.launch_date) : s;
+      const end = p.status === 'ongoing' ? monthEnd : (p.launch_date ? new Date(p.launch_date) : s);
       return end >= monthStart && s <= monthEnd;
     });
     months.push({ label: monthStart.toLocaleDateString('nl-NL',{month:'long'}), monthStart, active });
@@ -524,7 +643,7 @@ function renderYearCalendar(containerId, projects) {
     return `<div class="year-month-card ${isCurrent?'current':''}">
       <div class="year-month-label">${m.label.charAt(0).toUpperCase()+m.label.slice(1)}</div>
       <div class="year-month-pills">
-        ${shown.map(p => `<div class="cal-chip" style="background:${p.color}" onclick="openProject('${p.id}')" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</div>`).join('')}
+        ${shown.map(p => `<div class="cal-chip" style="${p.status==='ongoing' ? `background:transparent;border:1.5px solid ${getEffectiveColor(p)};color:${getEffectiveColor(p)};` : `background:${getEffectiveColor(p)};`}" onclick="${calItemOnclick(p)}" title="${escapeHtml(p.name)}">${p.external?'\u{1F517} ':''}${escapeHtml(p.name)}</div>`).join('')}
         ${extra > 0 ? `<div class="cal-chip more">+${extra} meer</div>` : ''}
         ${!m.active.length ? '<div class="year-month-empty">\u2014</div>' : ''}
       </div>
@@ -562,7 +681,7 @@ function renderMonthCalendar(containerId, projects) {
     const bandRows = computeWeekBands(week, projects);
     const bandRowsHtml = bandRows.map(row => `
       <div class="cal-band-grid">
-        ${row.map(b => `<div class="cal-band" style="background:${b.color};color:#fff;grid-column:${b.colStart+1} / ${b.colEnd+2}" onclick="openProject('${b.id}')" title="${escapeHtml(b.label)}">${escapeHtml(b.label)}</div>`).join('')}
+        ${row.map(b => `<div class="cal-band" style="${b.ongoing ? `background:repeating-linear-gradient(90deg, ${b.color} 0 6px, ${b.color}99 6px 10px);` : `background:${b.color};`}grid-column:${b.colStart+1} / ${b.colEnd+2}" onclick="${calItemOnclick(b)}" title="${escapeHtml(b.label)}">${b.external ? '\u{1F517}' : b.initial}</div>`).join('')}
       </div>
     `).join('');
     const singleCells = week.map(day => {
@@ -570,7 +689,7 @@ function renderMonthCalendar(containerId, projects) {
       const shown = items.slice(0,2);
       const extra = items.length - shown.length;
       return `<div class="cal-single-cell">
-        ${shown.map(e => `<div class="cal-chip" style="background:${e.color}" onclick="openProject('${e.id}')" title="${escapeHtml(e.label)}">${escapeHtml(e.label)}</div>`).join('')}
+        ${shown.map(e => `<div class="cal-chip" style="background:${e.color}" onclick="${calItemOnclick(e)}" title="${escapeHtml(e.label)}">${escapeHtml(e.label)}</div>`).join('')}
         ${extra > 0 ? `<div class="cal-chip more" style="background:transparent;color:var(--text-faint);">+${extra} meer</div>` : ''}
       </div>`;
     }).join('');
@@ -593,17 +712,74 @@ function renderMonthCalendar(containerId, projects) {
   `;
   wireCalControls(containerId, projects);
 }
+function computeBarRange(p, monthStart, monthEnd) {
+  const isOngoing = p.status === 'ongoing';
+  const start = p.start_date ? new Date(p.start_date) : null;
+  if (!start) return null;
+  const end = isOngoing ? monthEnd : (p.launch_date ? new Date(p.launch_date) : start);
+  const segStart = start < monthStart ? monthStart : start;
+  const segEnd = end > monthEnd ? monthEnd : end;
+  if (segEnd < monthStart || segStart > monthEnd) return null;
+  const startDay = segStart.getDate();
+  const endDay = Math.max(startDay, segEnd.getDate());
+  return { startDay, endDay, isOngoing };
+}
+function renderPlanningView(containerId, projects) {
+  const container = document.getElementById(containerId);
+  const anchor = calState.anchor;
+  const monthStart = startOfMonth(anchor);
+  const monthEnd = new Date(anchor.getFullYear(), anchor.getMonth()+1, 0);
+  const daysInMonth = monthEnd.getDate();
+  const today = new Date();
+  const todayInMonth = today.getFullYear()===anchor.getFullYear() && today.getMonth()===anchor.getMonth();
+
+  const rows = projects.map(p => {
+    const range = computeBarRange(p, monthStart, monthEnd);
+    return range ? { p, range } : null;
+  }).filter(Boolean);
+
+  const dayNumsHtml = Array.from({ length: daysInMonth }, (_, i) => {
+    const isToday = todayInMonth && (i + 1) === today.getDate();
+    return `<span class="${isToday?'today':''}">${i + 1}</span>`;
+  }).join('');
+
+  const rowsHtml = rows.length ? rows.map(({ p, range }) => {
+    const color = getEffectiveColor(p);
+    const left = ((range.startDay - 1) / daysInMonth) * 100;
+    const width = Math.max(((range.endDay - range.startDay + 1) / daysInMonth) * 100, (1 / daysInMonth) * 100);
+    return `<div class="plan-row">
+        <div class="plan-label"><span class="dot" style="background:${color}"></span><span>${p.external ? '\u{1F517} ' : ''}${escapeHtml(p.name)}</span></div>
+        <div class="plan-track">
+          <div class="plan-bar" style="left:${left}%;width:${width}%;${range.isOngoing ? `background:repeating-linear-gradient(90deg, ${color} 0 6px, ${color}99 6px 10px);` : `background:${color};`}" onclick="${calItemOnclick(p)}" title="${escapeHtml(p.name)}"></div>
+        </div>
+      </div>`;
+  }).join('') : '<div class="state-msg" style="padding:20px;">Geen projecten deze maand.</div>';
+
+  const monthLabel = anchor.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' });
+  container.innerHTML = `
+    <div class="cal-controls">
+      <div class="cal-title">${monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}</div>
+      <div class="cal-nav">${calModeToggleHtml()}<button class="icon" id="calPrev">\u2190</button><button class="small" id="calToday">Vandaag</button><button class="icon" id="calNext">\u2192</button></div>
+    </div>
+    <div class="timeline">
+      <div class="plan-daynums">${dayNumsHtml}</div>
+      <div class="plan-rows">${rowsHtml}</div>
+    </div>
+  `;
+  wireCalControls(containerId, projects);
+}
 
 function renderProjectList(containerId, projects, title) {
   const container = document.getElementById(containerId);
   if (!projects.length) { container.innerHTML = ''; return; }
   const rows = projects.map(p => {
-    const cd = countdownLabel(p.launch_date);
+    const isOngoing = p.status === 'ongoing';
+    const cd = isOngoing ? { text: 'doorlopend', cls: '' } : countdownLabel(p.launch_date);
     return `
       <div class="proj-row" onclick="openProject('${p.id}')">
-        <span class="dot" style="background:${p.color}"></span>
+        <span class="dot" style="background:${getEffectiveColor(p)}"></span>
         <span class="p-name">${escapeHtml(p.name)}</span>
-        <span class="p-period">${isoToDutch(p.start_date)} \u2192 ${p.launch_date ? isoToDutch(p.launch_date) : '?'}</span>
+        <span class="p-period">${isoToDutch(p.start_date)} \u2192 ${isOngoing ? '\u221e' : (p.launch_date ? isoToDutch(p.launch_date) : '?')}</span>
         <span class="p-status status-${p.status}">${statusLabel(p.status)}</span>
         ${p.owner_email ? `<span class="p-owner" style="color:${memberColor(p.owner_email)}">\u{1F464} ${escapeHtml(memberName(p.owner_email))}</span>` : ''}
         <span class="p-countdown ${cd.cls}">${cd.text}</span>
@@ -621,11 +797,13 @@ async function loadHome() {
   const sidebar = document.getElementById('homeSidebar');
   calWrap.innerHTML = '<div class="state-msg">Laden\u2026</div>'; listWrap.innerHTML = ''; sidebar.innerHTML = '';
   try {
-    const projects = await sbSelect('team_projects', 'archived=eq.false&select=*&order=launch_date.asc.nullslast');
-    calWrap.innerHTML = '<div id="homeCal"></div>';
-    renderHomeCalendar('homeCal', projects);
+    const allProjects = await sbSelect('team_projects', 'archived=eq.false&select=*&order=launch_date.asc.nullslast');
+    const projects = allProjects.filter(p => !isHiddenByPrefs(p));
+    calWrap.innerHTML = memberFilterChipsHtml() + '<div id="homeCal"></div>';
+    const rmnProjects = (await loadRmnProjects()).filter(p => !isHiddenByPrefs(p));
+    renderHomeCalendar('homeCal', projects.concat(rmnProjects));
     renderProjectList('homeListWrap', projects);
-    if (!projects.length) calWrap.innerHTML += '<div class="state-msg">Nog geen projecten. Klik op "+ Nieuw project" om te starten.</div>';
+    if (!allProjects.length) calWrap.innerHTML += '<div class="state-msg">Nog geen projecten. Klik op "+ Nieuw project" om te starten.</div>';
     loadSidebarTodos(projects);
   } catch (e) {
     calWrap.innerHTML = `<div class="state-msg">Kon projecten niet laden (${escapeHtml(e.message)}).<br><button class="small" onclick="loadHome()">Opnieuw proberen</button></div>`;
@@ -662,11 +840,14 @@ function filterArchiveList() {
 }
 async function loadSidebarTodos(projects) {
   const sidebar = document.getElementById('homeSidebar');
-  if (!projects.length) { sidebar.innerHTML = '<h3>Openstaande taken</h3><div class="state-msg" style="padding:20px;">Niets openstaand.</div>'; return; }
+  const isMod = currentIsModerator();
+  const title = (isLoggedIn && !isMod) ? 'Mijn openstaande taken' : 'Openstaande taken';
+  if (!projects.length) { sidebar.innerHTML = `<h3>${title}</h3><div class="state-msg" style="padding:20px;">Niets openstaand.</div>`; return; }
   try {
     const projectMap = {}; projects.forEach(p => projectMap[p.id] = p);
     const steps = await sbSelect('team_project_steps', 'status=neq.done&select=id,project_id,step_name,priority,order_num,assignee_email&order=order_num.asc');
-    const relevant = steps.filter(s => projectMap[s.project_id]);
+    let relevant = steps.filter(s => projectMap[s.project_id]);
+    if (isLoggedIn && !isMod) relevant = relevant.filter(s => s.assignee_email === currentUserEmail);
 
     const launchTime = (projectId) => {
       const p = projectMap[projectId];
@@ -675,16 +856,16 @@ async function loadSidebarTodos(projects) {
     const prioRank = { rood: 0, oranje: 1, groen: 2 };
     const sorted = relevant.slice().sort((a,b) => (prioRank[a.priority]??3) - (prioRank[b.priority]??3) || launchTime(a.project_id) - launchTime(b.project_id));
 
-    if (!sorted.length) { sidebar.innerHTML = '<h3>Openstaande taken</h3><div class="state-msg" style="padding:20px;">Niets openstaand.</div>'; return; }
-    sidebar.innerHTML = `<h3>Openstaande taken</h3>${sorted.slice(0,25).map(s => {
+    if (!sorted.length) { sidebar.innerHTML = `<h3>${title}</h3><div class="state-msg" style="padding:20px;">Niets openstaand.</div>`; return; }
+    sidebar.innerHTML = `<h3>${title}</h3>${sorted.slice(0,25).map(s => {
       const proj = projectMap[s.project_id];
       return `<div class="sidebar-todo prio-${s.priority||'none'}" onclick="openProject('${s.project_id}')">
         <span class="sidebar-prio ${s.priority||'none'}"></span>
-        <div class="sidebar-todo-text">${escapeHtml(s.step_name)}${s.assignee_email ? `<div class="sidebar-todo-proj" style="color:${memberColor(s.assignee_email)}">\u{1F464} ${escapeHtml(memberName(s.assignee_email))}</div>` : ''}<div class="sidebar-todo-proj" style="color:${proj.color}">${escapeHtml(proj.name)}</div></div>
+        <div class="sidebar-todo-text">${escapeHtml(s.step_name)}${(isMod && s.assignee_email) ? `<div class="sidebar-todo-proj" style="color:${memberColor(s.assignee_email)}">\u{1F464} ${escapeHtml(memberName(s.assignee_email))}</div>` : ''}<div class="sidebar-todo-proj" style="color:${getEffectiveColor(proj)}">${escapeHtml(proj.name)}</div></div>
       </div>`;
     }).join('')}`;
   } catch (e) {
-    sidebar.innerHTML = `<h3>Openstaande taken</h3><div class="state-msg">Kon niet laden.</div>`;
+    sidebar.innerHTML = `<h3>${title}</h3><div class="state-msg">Kon niet laden.</div>`;
   }
 }
 function goHome() {
@@ -707,29 +888,31 @@ function showNewProjectModal() {
     <div class="field"><label>Naam</label><input type="text" id="npName" placeholder="Projectnaam"></div>
     <div class="field"><label>Eigenaar</label><select id="npOwner">${ownerOptionsHtml(currentUserEmail)}</select></div>
     ${dateFieldHtml('npStart', 'Startdatum', todayDutch())}
-    ${dateFieldHtml('npLaunch', 'Streefdatum / launch', '')}
+    <div class="field"><label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;"><input type="checkbox" id="npOngoing" style="width:auto;" onchange="document.getElementById('npLaunchField').classList.toggle('hidden', this.checked)"> Doorlopend project (geen einddatum, bv. wekelijkse podcast)</label></div>
+    <div id="npLaunchField">${dateFieldHtml('npLaunch', 'Streefdatum / launch', '')}</div>
     <div class="modal-actions"><button class="ghost" id="modalCancel">Annuleren</button><button class="primary" id="modalCreate">Aanmaken</button></div>
   `);
   document.getElementById('modalCancel').onclick = closeModal;
   document.getElementById('modalCreate').onclick = async () => {
     const name = document.getElementById('npName').value.trim();
     if (!name) { alert('Geef het project een naam.'); return; }
+    const isOngoing = document.getElementById('npOngoing').checked;
     const startStr = document.getElementById('npStart').value.trim();
     const launchStr = document.getElementById('npLaunch').value.trim();
     const startD = startStr ? parseDutchDate(startStr) : null;
     if (startStr && !startD) { alert('Startdatum klopt niet.'); return; }
     const launchD = launchStr ? parseDutchDate(launchStr) : null;
-    if (launchStr && !launchD) { alert('Streefdatum klopt niet.'); return; }
+    if (!isOngoing && launchStr && !launchD) { alert('Streefdatum klopt niet.'); return; }
     const btn = document.getElementById('modalCreate');
     btn.disabled = true; btn.textContent = 'Bezig\u2026';
     try {
       const id = uid('proj');
       const ownerEmail = document.getElementById('npOwner').value || null;
       await sbInsert('team_projects', [{
-        id, name, status: 'in_productie', color: ownerEmail ? memberColor(ownerEmail) : '#9a9da6',
+        id, name, status: isOngoing ? 'ongoing' : 'in_productie', color: ownerEmail ? memberColor(ownerEmail) : '#9a9da6',
         owner_email: ownerEmail,
         start_date: startD ? toIso(startD) : null,
-        launch_date: launchD ? toIso(launchD) : null,
+        launch_date: isOngoing ? null : (launchD ? toIso(launchD) : null),
         concept: ''
       }]);
       closeModal();
@@ -776,23 +959,25 @@ function editProjectModal(project) {
     <div class="field"><label>Naam</label><input type="text" id="epName" value="${escapeHtml(project.name)}"></div>
     <div class="field"><label>Eigenaar</label><select id="epOwner">${ownerOptionsHtml(project.owner_email)}</select></div>
     ${dateFieldHtml('epStart', 'Startdatum', isoToDutch(project.start_date))}
-    ${dateFieldHtml('epLaunch', 'Streefdatum / launch', isoToDutch(project.launch_date))}
     <div class="field"><label>Status</label>
-      <select id="epStatus">
+      <select id="epStatus" onchange="document.getElementById('epLaunchField').classList.toggle('hidden', this.value==='ongoing')">
         <option value="in_productie" ${project.status==='in_productie'?'selected':''}>In productie</option>
         <option value="live" ${project.status==='live'?'selected':''}>Live</option>
+        <option value="ongoing" ${project.status==='ongoing'?'selected':''}>Doorlopend</option>
       </select>
     </div>
+    <div id="epLaunchField" class="${project.status==='ongoing'?'hidden':''}">${dateFieldHtml('epLaunch', 'Streefdatum / launch', isoToDutch(project.launch_date))}</div>
     <div class="modal-actions"><button class="ghost" id="modalCancel">Annuleren</button><button class="primary" id="modalSave">Opslaan</button></div>
   `);
   document.getElementById('modalCancel').onclick = closeModal;
   document.getElementById('modalSave').onclick = async () => {
+    const status = document.getElementById('epStatus').value;
     const startStr = document.getElementById('epStart').value.trim();
     const launchStr = document.getElementById('epLaunch').value.trim();
     const startD = startStr ? parseDutchDate(startStr) : null;
     if (startStr && !startD) { alert('Startdatum klopt niet.'); return; }
     const launchD = launchStr ? parseDutchDate(launchStr) : null;
-    if (launchStr && !launchD) { alert('Streefdatum klopt niet.'); return; }
+    if (status !== 'ongoing' && launchStr && !launchD) { alert('Streefdatum klopt niet.'); return; }
     const btn = document.getElementById('modalSave');
     btn.disabled = true; btn.textContent = 'Bezig\u2026';
     try {
@@ -802,8 +987,8 @@ function editProjectModal(project) {
         owner_email: ownerEmail,
         color: ownerEmail ? memberColor(ownerEmail) : '#9a9da6',
         start_date: startD ? toIso(startD) : null,
-        launch_date: launchD ? toIso(launchD) : null,
-        status: document.getElementById('epStatus').value
+        launch_date: status === 'ongoing' ? null : (launchD ? toIso(launchD) : null),
+        status
       });
       closeModal(); openProject(project.id);
     } catch (err) {
@@ -863,9 +1048,8 @@ async function openProject(projectId, isShared, fromHistory) {
     </div>
     <div class="tracks">
       <div class="tracks-lists">
-        ${trackColHtml(p, 'taken', "To-do's", takenSteps, isShared, false)}
-        ${extraTracks.map(t => trackColHtml(p, t.id, t.name, steps.filter(s => s.track === t.id), isShared, true)).join('')}
-        ${isShared ? '' : `<button class="add-track-btn" title="Extra lijst toevoegen" onclick="addTrackUI('${p.id}')">+</button>`}
+        ${extraTracks.length ? trackColHtml(p, 'taken', "To-do's", takenSteps, isShared, false, false) : trackColHtml(p, 'taken', "To-do's", takenSteps, isShared, false, true)}
+        ${extraTracks.map((t, i) => trackColHtml(p, t.id, t.name, steps.filter(s => s.track === t.id), isShared, true, i === extraTracks.length - 1)).join('')}
       </div>
       ${isShared ? '' : `<div class="tracks-files">${filesColHtml(p, files || [])}</div>`}
     </div>
@@ -884,10 +1068,10 @@ function parseExtraTracks(p) {
   } catch (e) {}
   return [{ id: 'extra', name: p.extra_track_name }];
 }
-function trackColHtml(p, trackKey, label, trackSteps, isShared, removable) {
+function trackColHtml(p, trackKey, label, trackSteps, isShared, removable, showAddBtn) {
   return `
       <div class="track-col">
-        <div class="track-head"><div class="track-head-left"><span class="dot" style="background:${p.color}"></span>${escapeHtml(label)}</div>${(removable && !isShared) ? `<button class="ghost" style="padding:2px 6px;font-size:13px;" title="Lijst verwijderen" onclick="removeTrackUI('${p.id}','${trackKey}')">\u00d7</button>` : ''}</div>
+        <div class="track-head"><div class="track-head-left"><span class="dot" style="background:${p.color}"></span>${escapeHtml(label)}</div><div style="display:flex;align-items:center;gap:2px;">${(showAddBtn && !isShared) ? `<button class="add-track-btn" title="Extra lijst toevoegen" onclick="addTrackUI('${p.id}')">+</button>` : ''}${(removable && !isShared) ? `<button class="ghost" style="padding:2px 6px;font-size:13px;" title="Lijst verwijderen" onclick="removeTrackUI('${p.id}','${trackKey}')">\u00d7</button>` : ''}</div></div>
         <div class="step-list" id="steplist_${trackKey}" data-track="${trackKey}" data-project="${p.id}">
           ${sortForDisplay(trackSteps).map(s => stepHtml(p.id, s, isShared, p.owner_email)).join('')}
         </div>
@@ -1036,8 +1220,9 @@ function renderTimelineMonth(p, steps) {
   const daysInMonth = monthEnd.getDate();
   const today = new Date();
 
+  const isOngoing = p.status === 'ongoing';
   const start = p.start_date ? new Date(p.start_date) : null;
-  const end = p.launch_date ? new Date(p.launch_date) : null;
+  const end = isOngoing ? monthEnd : (p.launch_date ? new Date(p.launch_date) : null);
 
   let barStartDay = null, barEndDay = null;
   if (start && end) {
@@ -1062,7 +1247,7 @@ function renderTimelineMonth(p, steps) {
   const dayNumsHtml = Array.from({ length: daysInMonth }, (_, i) => `<span>${i + 1}</span>`).join('');
 
   const barHtml = (barStartDay && barEndDay) ? `
-    <div class="tlcal-bar" style="left:${((barStartDay - 1) / daysInMonth) * 100}%; width:${((barEndDay - barStartDay + 1) / daysInMonth) * 100}%; background:${p.color};">
+    <div class="tlcal-bar" style="left:${((barStartDay - 1) / daysInMonth) * 100}%; width:${((barEndDay - barStartDay + 1) / daysInMonth) * 100}%; ${isOngoing ? `background:var(--panel);border:1.5px solid ${p.color};color:${p.color};` : `background:${p.color};`}">
       <span>${doneCount}/${totalCount} klaar</span>
       ${deadlineDays.map(m => `<div class="tlcal-break" style="left:${((m.day - barStartDay) / (barEndDay - barStartDay + 1)) * 100}%" title="${escapeHtml(m.label)}"></div>`).join('')}
     </div>` : '';
@@ -1423,6 +1608,7 @@ document.getElementById('newProjectBtn').onclick = showNewProjectModal;
 document.getElementById('homeLink').onclick = () => goHome();
 document.getElementById('settingsBtn').onclick = showTeamSettingsModal;
 document.getElementById('archiveBtn').onclick = loadArchive;
+document.getElementById('viewPrefsBtn').onclick = showViewPrefsModal;
 
 const __initialRoute = parseRouteFromUrl();
 if (__initialRoute.view === 'shared') {
