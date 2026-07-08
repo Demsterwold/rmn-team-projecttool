@@ -85,6 +85,17 @@ button:disabled { opacity: 0.5; cursor: default; }
 .sidebar-prio.groen { background: var(--green); }
 .sidebar-todo-text { flex: 1; min-width: 0; }
 .sidebar-todo-proj { font-size: 10px; color: var(--text-faint); margin-top: 2px; }
+.sidebar-todo[draggable="true"] { cursor: grab; }
+.sidebar-todo.dragging { opacity: 0.4; }
+.sidebar-todo.drag-over { border-top: 2px solid var(--accent); }
+.sidebar-todo-hide { border: none; background: transparent; color: var(--text-faint); font-size: 13px; padding: 2px 4px; cursor: pointer; flex-shrink: 0; opacity: 0; transition: opacity 0.12s; }
+.sidebar-todo:hover .sidebar-todo-hide { opacity: 1; }
+.sidebar-todo-hide:hover { color: var(--red); }
+.sidebar-group-head { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 12px; }
+.sidebar-group-head:hover { background: var(--panel-hover); }
+.sidebar-group-name { flex: 1; font-weight: 600; }
+.sidebar-group-count { font-size: 11px; color: var(--text-faint); font-family: var(--mono); }
+.sidebar-group-chevron { color: var(--text-faint); font-size: 10px; width: 10px; text-align: center; }
 
 .proj-list { margin-top: 28px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .proj-list h3 { margin: 0; padding: 14px 18px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); border-bottom: 1px solid var(--border); }
@@ -332,8 +343,8 @@ async function loadRmnProjects() {
 function getLocalPrefs() {
   try {
     const raw = JSON.parse(localStorage.getItem('csp_view_prefs') || '{}');
-    return { hiddenOwners: raw.hiddenOwners || [], colorOverrides: raw.colorOverrides || {} };
-  } catch (e) { return { hiddenOwners: [], colorOverrides: {} }; }
+    return { hiddenOwners: raw.hiddenOwners || [], colorOverrides: raw.colorOverrides || {}, taskOrder: raw.taskOrder || [], hiddenTasks: raw.hiddenTasks || [] };
+  } catch (e) { return { hiddenOwners: [], colorOverrides: {}, taskOrder: [], hiddenTasks: [] }; }
 }
 function saveLocalPrefs(p) { localStorage.setItem('csp_view_prefs', JSON.stringify(p)); }
 function getEffectiveColor(p) {
@@ -928,6 +939,9 @@ function filterArchiveList() {
   const inner = document.getElementById('archiveListInner');
   if (!filtered.length) inner.innerHTML = __archiveProjects.length ? '<div class="state-msg">Geen projecten gevonden.</div>' : '<div class="state-msg">Het archief is nog leeg.</div>';
 }
+let __sidebarModData = null;
+let __sidebarPersonalData = null, __sidebarPersonalTitle = '';
+let __expandedMembers = {};
 async function loadSidebarTodos(projects) {
   const sidebar = document.getElementById('homeSidebar');
   const isMod = currentIsModerator();
@@ -937,26 +951,117 @@ async function loadSidebarTodos(projects) {
     const projectMap = {}; projects.forEach(p => projectMap[p.id] = p);
     const steps = await sbSelect('team_project_steps', 'status=neq.done&select=id,project_id,step_name,priority,order_num,assignee_email&order=order_num.asc');
     let relevant = steps.filter(s => projectMap[s.project_id]);
-    if (isLoggedIn && !isMod) relevant = relevant.filter(s => s.assignee_email === currentUserEmail);
 
-    const launchTime = (projectId) => {
-      const p = projectMap[projectId];
-      return (p && p.launch_date) ? new Date(p.launch_date).getTime() : Infinity;
-    };
-    const prioRank = { rood: 0, oranje: 1, groen: 2 };
-    const sorted = relevant.slice().sort((a,b) => (prioRank[a.priority]??3) - (prioRank[b.priority]??3) || launchTime(a.project_id) - launchTime(b.project_id));
+    if (isMod) {
+      __sidebarModData = { relevant, projectMap };
+      renderModeratorSidebar(sidebar, relevant, projectMap);
+      return;
+    }
 
-    if (!sorted.length) { sidebar.innerHTML = `<h3>${title}</h3><div class="state-msg" style="padding:20px;">Niets openstaand.</div>`; return; }
-    sidebar.innerHTML = `<h3>${title}</h3>${sorted.slice(0,25).map(s => {
-      const proj = projectMap[s.project_id];
-      return `<div class="sidebar-todo prio-${s.priority||'none'}" onclick="openProject('${s.project_id}')">
-        <span class="sidebar-prio ${s.priority||'none'}"></span>
-        <div class="sidebar-todo-text">${escapeHtml(s.step_name)}${(isMod && s.assignee_email) ? `<div class="sidebar-todo-proj" style="color:${memberColor(s.assignee_email)}">\u{1F464} ${escapeHtml(memberName(s.assignee_email))}</div>` : ''}<div class="sidebar-todo-proj" style="color:${getEffectiveColor(proj)}">${escapeHtml(proj.name)}</div></div>
-      </div>`;
-    }).join('')}`;
+    if (isLoggedIn) relevant = relevant.filter(s => s.assignee_email === currentUserEmail);
+    __sidebarPersonalData = { relevant, projectMap };
+    __sidebarPersonalTitle = title;
+    renderPersonalSidebar(sidebar, title, relevant, projectMap);
   } catch (e) {
     sidebar.innerHTML = `<h3>${title}</h3><div class="state-msg">Kon niet laden.</div>`;
   }
+}
+function renderModeratorSidebar(sidebar, relevant, projectMap) {
+  const prioRank = { rood: 0, oranje: 1, groen: 2 };
+  const groupHtml = (key, name, color, items) => {
+    const expanded = !!__expandedMembers[key];
+    const sortedItems = items.slice().sort((a,b) => (prioRank[a.priority]??3) - (prioRank[b.priority]??3));
+    return `<div class="sidebar-group">
+      <div class="sidebar-group-head" onclick="toggleMemberExpand('${key}')">
+        <span class="dot" style="background:${color}"></span>
+        <span class="sidebar-group-name">${escapeHtml(name)}</span>
+        <span class="sidebar-group-count">${items.length}</span>
+        <span class="sidebar-group-chevron">${expanded ? '\u25be' : '\u25b8'}</span>
+      </div>
+      ${expanded ? sortedItems.map(s => {
+        const proj = projectMap[s.project_id];
+        return `<div class="sidebar-todo prio-${s.priority||'none'}" onclick="openProject('${s.project_id}')">
+          <span class="sidebar-prio ${s.priority||'none'}"></span>
+          <div class="sidebar-todo-text">${escapeHtml(s.step_name)}<div class="sidebar-todo-proj" style="color:${getEffectiveColor(proj)}">${escapeHtml(proj.name)}</div></div>
+        </div>`;
+      }).join('') : ''}
+    </div>`;
+  };
+  const groups = {};
+  const unassigned = [];
+  relevant.forEach(s => {
+    if (s.assignee_email) { (groups[s.assignee_email] = groups[s.assignee_email] || []).push(s); }
+    else unassigned.push(s);
+  });
+  const memberKeys = teamMembers.map(m => m.email).filter(e => groups[e] && groups[e].length);
+  if (!memberKeys.length && !unassigned.length) { sidebar.innerHTML = '<h3>Openstaande taken</h3><div class="state-msg" style="padding:20px;">Niets openstaand.</div>'; return; }
+  const rowsHtml = memberKeys.map(email => groupHtml(email, memberName(email), memberColor(email), groups[email])).join('');
+  const unassignedHtml = unassigned.length ? groupHtml('__unassigned', 'Niet toegewezen', '#9a9da6', unassigned) : '';
+  sidebar.innerHTML = `<h3>Openstaande taken</h3>${rowsHtml}${unassignedHtml}`;
+}
+function toggleMemberExpand(key) {
+  __expandedMembers[key] = !__expandedMembers[key];
+  if (__sidebarModData) renderModeratorSidebar(document.getElementById('homeSidebar'), __sidebarModData.relevant, __sidebarModData.projectMap);
+}
+function renderPersonalSidebar(sidebar, title, relevant, projectMap) {
+  const prefs = getLocalPrefs();
+  const visible = relevant.filter(s => !prefs.hiddenTasks.includes(s.id));
+  const prioRank = { rood: 0, oranje: 1, groen: 2 };
+  const launchTime = (projectId) => { const p = projectMap[projectId]; return (p && p.launch_date) ? new Date(p.launch_date).getTime() : Infinity; };
+  const orderIdx = (id) => { const i = prefs.taskOrder.indexOf(id); return i === -1 ? 999999 : i; };
+  const sorted = visible.slice().sort((a,b) => orderIdx(a.id) - orderIdx(b.id) || (prioRank[a.priority]??3) - (prioRank[b.priority]??3) || launchTime(a.project_id) - launchTime(b.project_id));
+  const hiddenCount = relevant.length - visible.length;
+  const hiddenLinkHtml = hiddenCount ? `<div style="padding:8px 16px;"><button class="ghost small" onclick="unhideAllTasks()">${hiddenCount} verborgen \u2014 toon weer</button></div>` : '';
+  if (!sorted.length) {
+    sidebar.innerHTML = `<h3>${title}</h3><div class="state-msg" style="padding:20px;">Niets openstaand.</div>${hiddenLinkHtml}`;
+    return;
+  }
+  sidebar.innerHTML = `<h3>${title}</h3><div id="sidebarTodoList">${sorted.slice(0,30).map(s => sidebarTodoRowHtml(s, projectMap)).join('')}</div>${hiddenLinkHtml}`;
+  if (isLoggedIn) setupSidebarDragDrop(document.getElementById('sidebarTodoList'));
+}
+function sidebarTodoRowHtml(s, projectMap) {
+  const proj = projectMap[s.project_id];
+  return `<div class="sidebar-todo prio-${s.priority||'none'}" data-task-id="${s.id}" ${isLoggedIn ? 'draggable="true"' : ''} onclick="openProject('${s.project_id}')">
+    <span class="sidebar-prio ${s.priority||'none'}"></span>
+    <div class="sidebar-todo-text">${escapeHtml(s.step_name)}<div class="sidebar-todo-proj" style="color:${getEffectiveColor(proj)}">${escapeHtml(proj.name)}</div></div>
+    ${isLoggedIn ? `<button class="sidebar-todo-hide" title="Verbergen uit deze lijst" onclick="event.stopPropagation(); hideTaskFromSidebar('${s.id}')">\u00d7</button>` : ''}
+  </div>`;
+}
+function hideTaskFromSidebar(taskId) {
+  const prefs = getLocalPrefs();
+  if (!prefs.hiddenTasks.includes(taskId)) prefs.hiddenTasks.push(taskId);
+  saveLocalPrefs(prefs);
+  if (__sidebarPersonalData) renderPersonalSidebar(document.getElementById('homeSidebar'), __sidebarPersonalTitle, __sidebarPersonalData.relevant, __sidebarPersonalData.projectMap);
+}
+function unhideAllTasks() {
+  const prefs = getLocalPrefs();
+  prefs.hiddenTasks = [];
+  saveLocalPrefs(prefs);
+  if (__sidebarPersonalData) renderPersonalSidebar(document.getElementById('homeSidebar'), __sidebarPersonalTitle, __sidebarPersonalData.relevant, __sidebarPersonalData.projectMap);
+}
+function setupSidebarDragDrop(listEl) {
+  if (!listEl) return;
+  let draggedId = null;
+  listEl.querySelectorAll('.sidebar-todo[draggable="true"]').forEach(row => {
+    row.addEventListener('dragstart', () => { draggedId = row.dataset.taskId; row.classList.add('dragging'); });
+    row.addEventListener('dragend', () => { row.classList.remove('dragging'); listEl.querySelectorAll('.sidebar-todo').forEach(r => r.classList.remove('drag-over')); });
+    row.addEventListener('dragover', (e) => { e.preventDefault(); row.classList.add('drag-over'); });
+    row.addEventListener('dragleave', () => { row.classList.remove('drag-over'); });
+    row.addEventListener('drop', (e) => {
+      e.preventDefault(); row.classList.remove('drag-over');
+      const targetId = row.dataset.taskId;
+      if (!draggedId || draggedId === targetId) return;
+      const rows = Array.from(listEl.querySelectorAll('.sidebar-todo'));
+      const draggedEl = rows.find(r => r.dataset.taskId === draggedId);
+      if (!draggedEl) return;
+      const targetIdx = rows.indexOf(row);
+      listEl.insertBefore(draggedEl, rows.indexOf(draggedEl) < targetIdx ? row.nextSibling : row);
+      const newOrder = Array.from(listEl.querySelectorAll('.sidebar-todo')).map(r => r.dataset.taskId);
+      const prefs = getLocalPrefs();
+      prefs.taskOrder = newOrder;
+      saveLocalPrefs(prefs);
+    });
+  });
 }
 function goHome() {
   document.getElementById('detailView').classList.add('hidden');
