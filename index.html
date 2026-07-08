@@ -290,10 +290,13 @@ async function loadRmnOrder() {
     return JSON.parse(await data.text());
   } catch (e) { return {}; }
 }
-async function saveRmnOrder(orderMap) {
-  const blob = new Blob([JSON.stringify(orderMap)], { type: 'application/json' });
-  await authClient.storage.from('project-files').upload(RMN_ORDER_PATH, blob, { upsert: true });
+async function saveJsonSettings(path, obj) {
+  const blob = new Blob([JSON.stringify(obj)], { type: 'application/json' });
+  try { await authClient.storage.from('project-files').remove([path]); } catch (e) {}
+  const { error } = await authClient.storage.from('project-files').upload(path, blob);
+  if (error) throw error;
 }
+async function saveRmnOrder(orderMap) { await saveJsonSettings(RMN_ORDER_PATH, orderMap); }
 function getProjectOrder(p) {
   if (p.external) return p.__order || 0;
   return parseProjectMeta(p).order || 0;
@@ -306,10 +309,7 @@ async function loadFileLabels() {
     return JSON.parse(await data.text());
   } catch (e) { return {}; }
 }
-async function saveFileLabels(map) {
-  const blob = new Blob([JSON.stringify(map)], { type: 'application/json' });
-  await authClient.storage.from('project-files').upload(FILE_LABELS_PATH, blob, { upsert: true });
-}
+async function saveFileLabels(map) { await saveJsonSettings(FILE_LABELS_PATH, map); }
 async function loadRmnProjects() {
   try {
     const res = await fetch(RMN_TOOL_URL + '/rest/v1/projects?is_show_project=eq.false&select=id,name,status,color,start_date,launch_date&order=created_at.desc&limit=50', {
