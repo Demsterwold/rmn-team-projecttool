@@ -141,7 +141,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .tracks { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin: 24px 0 28px; max-width: 960px; align-items: start; }
 .track-col { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; }
 .track-head { padding: 12px 16px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.add-track-btn { border: 1.5px dashed var(--border); background: transparent; border-radius: var(--radius); min-height: 60px; display: flex; align-items: center; justify-content: center; color: var(--text-faint); font-size: 13px; cursor: pointer; }
+.add-track-btn { border: 1.5px dashed var(--border); background: transparent; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; color: var(--text-faint); font-size: 20px; line-height: 1; cursor: pointer; align-self: center; justify-self: center; }
 .add-track-btn:hover { border-color: var(--accent); color: var(--accent); }
 .file-list { display: flex; flex-direction: column; }
 .file-row { padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: 13px; display: flex; align-items: center; gap: 8px; }
@@ -837,7 +837,7 @@ async function openProject(projectId, isShared, fromHistory) {
 
   const cd = countdownLabel(p.launch_date);
   const takenSteps = steps.filter(s => (s.track || 'taken') === 'taken');
-  const extraSteps = steps.filter(s => s.track === 'extra');
+  const extraTracks = parseExtraTracks(p);
 
   view.innerHTML = `
     <div class="detail-header">
@@ -859,21 +859,30 @@ async function openProject(projectId, isShared, fromHistory) {
       <textarea id="conceptInput_${p.id}" placeholder="Waar gaat dit project over, en voor wie is het bedoeld?" ${isShared?'readonly':''} onblur="saveConcept('${p.id}')">${escapeHtml(p.concept || '')}</textarea>
     </div>
     <div class="tracks">
-      ${trackColHtml(p, 'taken', "To-do's", takenSteps, isShared)}
-      ${p.extra_track_name ? trackColHtml(p, 'extra', p.extra_track_name, extraSteps, isShared) : (isShared ? '' : `<button class="add-track-btn" onclick="addExtraTrackUI('${p.id}')">+ Extra lijst toevoegen</button>`)}
+      ${trackColHtml(p, 'taken', "To-do's", takenSteps, isShared, false)}
+      ${extraTracks.map(t => trackColHtml(p, t.id, t.name, steps.filter(s => s.track === t.id), isShared, true)).join('')}
+      ${isShared ? '' : `<button class="add-track-btn" title="Extra lijst toevoegen" onclick="addTrackUI('${p.id}')">+</button>`}
       ${isShared ? '' : filesColHtml(p, files || [])}
     </div>
   `;
   renderDetailTimeline(p, steps);
   if (!isShared) {
     setupDragDrop(document.getElementById('steplist_taken'));
-    if (p.extra_track_name) setupDragDrop(document.getElementById('steplist_extra'));
+    extraTracks.forEach(t => setupDragDrop(document.getElementById('steplist_' + t.id)));
   }
 }
-function trackColHtml(p, trackKey, label, trackSteps, isShared) {
+function parseExtraTracks(p) {
+  if (!p.extra_track_name) return [];
+  try {
+    const arr = JSON.parse(p.extra_track_name);
+    if (Array.isArray(arr)) return arr;
+  } catch (e) {}
+  return [{ id: 'extra', name: p.extra_track_name }];
+}
+function trackColHtml(p, trackKey, label, trackSteps, isShared, removable) {
   return `
       <div class="track-col">
-        <div class="track-head"><div class="track-head-left"><span class="dot" style="background:${p.color}"></span>${escapeHtml(label)}</div>${(trackKey==='extra' && !isShared) ? `<button class="ghost" style="padding:2px 6px;font-size:13px;" title="Lijst verwijderen" onclick="removeExtraTrackUI('${p.id}')">\u00d7</button>` : ''}</div>
+        <div class="track-head"><div class="track-head-left"><span class="dot" style="background:${p.color}"></span>${escapeHtml(label)}</div>${(removable && !isShared) ? `<button class="ghost" style="padding:2px 6px;font-size:13px;" title="Lijst verwijderen" onclick="removeTrackUI('${p.id}','${trackKey}')">\u00d7</button>` : ''}</div>
         <div class="step-list" id="steplist_${trackKey}" data-track="${trackKey}" data-project="${p.id}">
           ${sortForDisplay(trackSteps).map(s => stepHtml(p.id, s, isShared, p.owner_email)).join('')}
         </div>
@@ -922,19 +931,28 @@ async function toggleArchiveProject(projectId, currentlyArchived) {
   try { await sbUpdate('team_projects', 'id=eq.' + projectId, { archived: !currentlyArchived }); refreshProjectView(projectId); }
   catch (e) { alert('Opslaan mislukt: ' + e.message); }
 }
-function addExtraTrackUI(projectId) {
+async function addTrackUI(projectId) {
   if (!requireLogin()) return;
-  const name = prompt('Naam van de extra lijst (bijv. "Marketing & distributie"):');
+  const name = prompt('Naam van de nieuwe lijst (bijv. "Marketing & distributie"):');
   if (!name || !name.trim()) return;
-  sbUpdate('team_projects', 'id=eq.' + projectId, { extra_track_name: name.trim() }).then(() => refreshProjectView(projectId)).catch(e => alert('Opslaan mislukt: ' + e.message));
+  try {
+    const p = await sbSelect('team_projects', 'id=eq.' + projectId + '&select=extra_track_name').then(r => r[0]);
+    const tracks = parseExtraTracks(p);
+    tracks.push({ id: uid('trk'), name: name.trim() });
+    await sbUpdate('team_projects', 'id=eq.' + projectId, { extra_track_name: JSON.stringify(tracks) });
+    refreshProjectView(projectId);
+  } catch (e) { alert('Opslaan mislukt: ' + e.message); }
 }
-function removeExtraTrackUI(projectId) {
+async function removeTrackUI(projectId, trackId) {
   if (!requireLogin()) return;
-  if (!confirm('Deze extra lijst en alle taken erin verwijderen?')) return;
-  sbDelete('team_project_steps', 'project_id=eq.' + projectId + '&track=eq.extra')
-    .then(() => sbUpdate('team_projects', 'id=eq.' + projectId, { extra_track_name: null }))
-    .then(() => refreshProjectView(projectId))
-    .catch(e => alert('Verwijderen mislukt: ' + e.message));
+  if (!confirm('Deze lijst en alle taken erin verwijderen?')) return;
+  try {
+    const p = await sbSelect('team_projects', 'id=eq.' + projectId + '&select=extra_track_name').then(r => r[0]);
+    const tracks = parseExtraTracks(p).filter(t => t.id !== trackId);
+    await sbDelete('team_project_steps', 'project_id=eq.' + projectId + '&track=eq.' + trackId);
+    await sbUpdate('team_projects', 'id=eq.' + projectId, { extra_track_name: tracks.length ? JSON.stringify(tracks) : null });
+    refreshProjectView(projectId);
+  } catch (e) { alert('Verwijderen mislukt: ' + e.message); }
 }
 function handleFileInputChange(projectId) {
   const input = document.getElementById('fileInput_' + projectId);
@@ -961,7 +979,17 @@ async function startFileUpload(projectId, file) {
     const path = projectId + '/' + Date.now() + '_' + safeName;
     const { error: upErr } = await authClient.storage.from('project-files').upload(path, file);
     if (upErr) throw upErr;
-    await sbInsert('project_files', [{ id: uid('file'), project_id: projectId, file_name: file.name, storage_path: path, size_bytes: file.size, uploaded_by: currentUserEmail, label: label.trim() || null }]);
+    const row = { id: uid('file'), project_id: projectId, file_name: file.name, storage_path: path, size_bytes: file.size, uploaded_by: currentUserEmail, label: label.trim() || null };
+    try {
+      await sbInsert('project_files', [row]);
+    } catch (insertErr) {
+      if (/label/i.test(insertErr.message)) {
+        delete row.label;
+        await sbInsert('project_files', [row]);
+      } else {
+        throw insertErr;
+      }
+    }
     refreshProjectView(projectId);
   } catch (e) {
     alert('Uploaden mislukt: ' + e.message);
