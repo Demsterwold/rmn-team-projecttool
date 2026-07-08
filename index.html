@@ -157,9 +157,12 @@ button:disabled { opacity: 0.5; cursor: default; }
 .project-concept textarea { width: 100%; min-height: 70px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); padding: 10px 12px; font-family: var(--sans); font-size: 13px; resize: vertical; }
 
 .tracks { display: flex; align-items: flex-start; gap: 16px; margin: 24px 0 28px; max-width: 1180px; }
-.tracks-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; flex: 1; min-width: 0; align-items: start; }
+.tracks-lists { columns: 260px; column-gap: 16px; flex: 1; min-width: 0; }
 .tracks-files { width: 280px; flex-shrink: 0; }
-.track-col { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; }
+.track-col { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; break-inside: avoid; margin-bottom: 16px; }
+.track-col[draggable="true"] .track-head { cursor: grab; }
+.track-col.dragging { opacity: 0.4; }
+.track-col.drag-over { outline: 2px solid var(--accent); outline-offset: -2px; }
 .track-head { padding: 12px 16px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .add-track-btn { border: 1.5px dashed var(--border); background: transparent; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; color: var(--text-faint); font-size: 14px; line-height: 1; cursor: pointer; flex-shrink: 0; margin-top: 8px; }
 .add-track-btn:hover { border-color: var(--accent); color: var(--accent); }
@@ -1104,6 +1107,10 @@ async function openProject(projectId, isShared, fromHistory) {
   const cd = countdownLabel(p.launch_date);
   const takenSteps = steps.filter(s => (s.track || 'taken') === 'taken');
   const extraTracks = parseExtraTracks(p);
+  const panels = orderedPanels(p);
+  const stepsForPanel = (key) => key === 'taken' ? takenSteps : steps.filter(s => s.track === key);
+  const labelForPanel = (key) => key === 'taken' ? "To-do's" : (extraTracks.find(t => t.id === key)?.name || key);
+  const removableForPanel = (key) => key !== 'taken';
 
   view.innerHTML = `
     <div class="detail-header">
@@ -1125,34 +1132,71 @@ async function openProject(projectId, isShared, fromHistory) {
       <textarea id="conceptInput_${p.id}" placeholder="Waar gaat dit project over, en voor wie is het bedoeld?" ${isShared?'readonly':''} onblur="saveConcept('${p.id}')">${escapeHtml(p.concept || '')}</textarea>
     </div>
     <div class="tracks">
-      <div class="tracks-lists">
-        ${trackColHtml(p, 'taken', "To-do's", takenSteps, isShared, false)}
-        ${extraTracks.map(t => trackColHtml(p, t.id, t.name, steps.filter(s => s.track === t.id), isShared, true)).join('')}
+      <div class="tracks-lists" id="tracksLists">
+        ${panels.map(pn => trackColHtml(p, pn.key, labelForPanel(pn.key), stepsForPanel(pn.key), isShared, removableForPanel(pn.key))).join('')}
       </div>
       ${isShared ? '' : `<button class="add-track-btn" title="Extra lijst toevoegen" onclick="addTrackUI('${p.id}')">+</button>`}
       ${isShared ? '' : `<div class="tracks-files">${filesColHtml(p, files || [])}</div>`}
     </div>
   `;
   renderDetailTimeline(p, steps);
+  if (!isShared) setupTracksDragDrop(document.getElementById('tracksLists'), p.id);
   if (!isShared) {
     setupDragDrop(document.getElementById('steplist_taken'));
     extraTracks.forEach(t => setupDragDrop(document.getElementById('steplist_' + t.id)));
   }
 }
+function setupTracksDragDrop(listsEl, projectId) {
+  if (!listsEl || !isLoggedIn) return;
+  let draggedKey = null;
+  listsEl.querySelectorAll('.track-col[draggable="true"]').forEach(col => {
+    col.addEventListener('dragstart', (e) => { draggedKey = col.dataset.trackKey; col.classList.add('dragging'); });
+    col.addEventListener('dragend', () => { col.classList.remove('dragging'); listsEl.querySelectorAll('.track-col').forEach(c => c.classList.remove('drag-over')); });
+    col.addEventListener('dragover', (e) => { e.preventDefault(); col.classList.add('drag-over'); });
+    col.addEventListener('dragleave', () => { col.classList.remove('drag-over'); });
+    col.addEventListener('drop', async (e) => {
+      e.preventDefault(); col.classList.remove('drag-over');
+      const targetKey = col.dataset.trackKey;
+      if (!draggedKey || draggedKey === targetKey) return;
+      const cols = Array.from(listsEl.querySelectorAll('.track-col'));
+      const draggedEl = cols.find(c => c.dataset.trackKey === draggedKey);
+      if (!draggedEl) return;
+      const targetIdx = cols.indexOf(col);
+      listsEl.insertBefore(draggedEl, cols.indexOf(draggedEl) < targetIdx ? col.nextSibling : col);
+      const newOrder = Array.from(listsEl.querySelectorAll('.track-col')).map(c => c.dataset.trackKey);
+      try {
+        const p = await sbSelect('team_projects', 'id=eq.' + projectId + '&select=extra_track_name').then(r => r[0]);
+        const meta = parseProjectMeta(p);
+        meta.panelOrder = newOrder;
+        await sbUpdate('team_projects', 'id=eq.' + projectId, { extra_track_name: stringifyProjectMeta(meta) });
+        if (curProject && curProjectId === projectId) curProject.extra_track_name = stringifyProjectMeta(meta);
+      } catch (err) { alert('Herordenen mislukt: ' + err.message); }
+    });
+  });
+}
 function parseProjectMeta(p) {
-  if (!p.extra_track_name) return { tracks: [], order: 0 };
+  if (!p.extra_track_name) return { tracks: [], order: 0, panelOrder: null };
   try {
     const parsed = JSON.parse(p.extra_track_name);
-    if (Array.isArray(parsed)) return { tracks: parsed, order: 0 };
-    if (parsed && typeof parsed === 'object') return { tracks: parsed.tracks || [], order: parsed.order || 0 };
+    if (Array.isArray(parsed)) return { tracks: parsed, order: 0, panelOrder: null };
+    if (parsed && typeof parsed === 'object') return { tracks: parsed.tracks || [], order: parsed.order || 0, panelOrder: parsed.panelOrder || null };
   } catch (e) {}
-  return { tracks: [{ id: 'extra', name: p.extra_track_name }], order: 0 };
+  return { tracks: [{ id: 'extra', name: p.extra_track_name }], order: 0, panelOrder: null };
 }
-function stringifyProjectMeta(meta) { return JSON.stringify({ tracks: meta.tracks || [], order: meta.order || 0 }); }
+function stringifyProjectMeta(meta) { return JSON.stringify({ tracks: meta.tracks || [], order: meta.order || 0, panelOrder: meta.panelOrder || null }); }
 function parseExtraTracks(p) { return parseProjectMeta(p).tracks; }
+function orderedPanels(p) {
+  const meta = parseProjectMeta(p);
+  const panels = [{ key: 'taken', label: "To-do's", removable: false }, ...meta.tracks.map(t => ({ key: t.id, label: t.name, removable: true }))];
+  if (meta.panelOrder && meta.panelOrder.length) {
+    const idx = (k) => { const i = meta.panelOrder.indexOf(k); return i === -1 ? 999 : i; };
+    panels.sort((a, b) => idx(a.key) - idx(b.key));
+  }
+  return panels;
+}
 function trackColHtml(p, trackKey, label, trackSteps, isShared, removable) {
   return `
-      <div class="track-col">
+      <div class="track-col" data-track-key="${trackKey}" ${isShared ? '' : 'draggable="true"'}>
         <div class="track-head"><div class="track-head-left"><span class="dot" style="background:${p.color}"></span>${escapeHtml(label)}</div>${(removable && !isShared) ? `<button class="ghost" style="padding:2px 6px;font-size:13px;" title="Lijst verwijderen" onclick="removeTrackUI('${p.id}','${trackKey}')">\u00d7</button>` : ''}</div>
         <div class="step-list" id="steplist_${trackKey}" data-track="${trackKey}" data-project="${p.id}">
           ${sortForDisplay(trackSteps).map(s => stepHtml(p.id, s, isShared, p.owner_email)).join('')}
