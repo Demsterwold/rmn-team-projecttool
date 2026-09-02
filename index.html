@@ -321,6 +321,22 @@ async function loadFileLabels() {
   } catch (e) { return {}; }
 }
 async function saveFileLabels(map) { await saveJsonSettings(FILE_LABELS_PATH, map); }
+const WEEKLY_RESET_MEMBERS_PATH = '_settings/weekly-reset-members.json';
+// Standaardlijst die geldt zolang het instellingenbestand nog niet is aangemaakt in Supabase Storage.
+const DEFAULT_WEEKLY_RESET_MEMBERS = ['rosella.degraaf@roularta.nl'];
+let weeklyResetMembers = DEFAULT_WEEKLY_RESET_MEMBERS.slice();
+async function loadWeeklyResetMembers() {
+  try {
+    const { data, error } = await authClient.storage.from('project-files').download(WEEKLY_RESET_MEMBERS_PATH);
+    if (error) throw error;
+    const arr = JSON.parse(await data.text());
+    weeklyResetMembers = Array.isArray(arr) ? arr : DEFAULT_WEEKLY_RESET_MEMBERS.slice();
+  } catch (e) {
+    // Bestand bestaat nog niet (of tijdelijk niet te laden): val terug op de standaardlijst.
+    weeklyResetMembers = DEFAULT_WEEKLY_RESET_MEMBERS.slice();
+  }
+}
+async function saveWeeklyResetMembers(arr) { await saveJsonSettings(WEEKLY_RESET_MEMBERS_PATH, arr); weeklyResetMembers = arr; }
 async function loadRmnProjects() {
   try {
     const res = await fetch(RMN_TOOL_URL + '/rest/v1/projects?is_show_project=eq.false&select=id,name,status,color,start_date,launch_date&order=created_at.desc&limit=50', {
@@ -468,10 +484,10 @@ function requireLogin() {
 }
 
 async function initAuthState() {
-  await loadTeamMembers();
+  await Promise.all([loadTeamMembers(), loadWeeklyResetMembers()]);
   const { data } = await authClient.auth.getSession();
   applyAuthState(data.session);
-  authClient.auth.onAuthStateChange(async (event, session) => { await loadTeamMembers(); applyAuthState(session); loadHome(); });
+  authClient.auth.onAuthStateChange(async (event, session) => { await Promise.all([loadTeamMembers(), loadWeeklyResetMembers()]); applyAuthState(session); loadHome(); });
 }
 function applyAuthState(session) {
   isLoggedIn = !!session;
@@ -586,6 +602,17 @@ function countdownLabel(iso) {
   if (n === 0) return {text: 'vandaag!', cls: 'soon'};
   if (n <= 14) return {text: 'nog ' + n + ' dagen', cls: 'soon'};
   return {text: 'nog ' + n + ' dagen', cls: ''};
+}
+
+// Meest recente verstreken zaterdag 16:00 (lokale tijd), t.b.v. de wekelijkse taak-reset.
+function lastWeeklyResetThreshold(now) {
+  now = now || new Date();
+  const d = new Date(now);
+  d.setHours(16, 0, 0, 0);
+  const diffToSaturday = (d.getDay() - 6 + 7) % 7; // 0 = vandaag is zaterdag
+  d.setDate(d.getDate() - diffToSaturday);
+  if (d > now) d.setDate(d.getDate() - 7); // het is zaterdag maar nog voor 16:00 -> vorige week
+  return d;
 }
 
 function renderModal(innerHtml) {
@@ -1201,6 +1228,28 @@ function editProjectModal(project) {
 
 // ================= Project detail =================
 let curProjectId = null, curProject = null, curSteps = [], curIsShared = false;
+// Wekelijkse reset van vinkjes voor doorlopende projecten (lazy check-on-load, geen server-cron nodig).
+async function maybeApplyWeeklyReset(p, steps) {
+  if (!isLoggedIn) return; // schrijven vereist een ingelogde sessie (RLS); anonieme kijkers slaan dit over
+  if (p.status !== 'ongoing') return;
+  if (!p.owner_email || !weeklyResetMembers.includes(p.owner_email)) return;
+  const threshold = lastWeeklyResetThreshold();
+  const meta = parseProjectMeta(p);
+  const lastReset = meta.lastReset ? new Date(meta.lastReset) : null;
+  if (lastReset && !isNaN(lastReset) && lastReset >= threshold) return;
+  const doneSteps = steps.filter(s => s.status === 'done');
+  try {
+    if (doneSteps.length) {
+      await Promise.all(doneSteps.map(s => sbUpdate('team_project_steps', 'id=eq.' + s.id, { status: 'pending' })));
+      doneSteps.forEach(s => { s.status = 'pending'; });
+    }
+    meta.lastReset = new Date().toISOString();
+    await sbUpdate('team_projects', 'id=eq.' + p.id, { extra_track_name: stringifyProjectMeta(meta) });
+    p.extra_track_name = stringifyProjectMeta(meta);
+  } catch (e) {
+    // Best-effort: als de reset (deels) mislukt, gewoon doorgaan met laden van het project.
+  }
+}
 async function openProject(projectId, isShared, fromHistory) {
   if (!fromHistory) {
     const params = new URLSearchParams(window.location.search);
@@ -1224,6 +1273,7 @@ async function openProject(projectId, isShared, fromHistory) {
     return;
   }
   if (!p) { view.innerHTML = '<div class="state-msg">Project niet gevonden.</div>'; return; }
+  if (!isShared) { await maybeApplyWeeklyReset(p, steps); }
   if (!isShared && files && files.length) {
     try {
       const labelMap = await loadFileLabels();
@@ -1303,15 +1353,15 @@ function setupTracksDragDrop(listsEl, projectId) {
   });
 }
 function parseProjectMeta(p) {
-  if (!p.extra_track_name) return { tracks: [], order: 0, panelOrder: null };
+  if (!p.extra_track_name) return { tracks: [], order: 0, panelOrder: null, lastReset: null };
   try {
     const parsed = JSON.parse(p.extra_track_name);
-    if (Array.isArray(parsed)) return { tracks: parsed, order: 0, panelOrder: null };
-    if (parsed && typeof parsed === 'object') return { tracks: parsed.tracks || [], order: parsed.order || 0, panelOrder: parsed.panelOrder || null };
+    if (Array.isArray(parsed)) return { tracks: parsed, order: 0, panelOrder: null, lastReset: null };
+    if (parsed && typeof parsed === 'object') return { tracks: parsed.tracks || [], order: parsed.order || 0, panelOrder: parsed.panelOrder || null, lastReset: parsed.lastReset || null };
   } catch (e) {}
-  return { tracks: [{ id: 'extra', name: p.extra_track_name }], order: 0, panelOrder: null };
+  return { tracks: [{ id: 'extra', name: p.extra_track_name }], order: 0, panelOrder: null, lastReset: null };
 }
-function stringifyProjectMeta(meta) { return JSON.stringify({ tracks: meta.tracks || [], order: meta.order || 0, panelOrder: meta.panelOrder || null }); }
+function stringifyProjectMeta(meta) { return JSON.stringify({ tracks: meta.tracks || [], order: meta.order || 0, panelOrder: meta.panelOrder || null, lastReset: meta.lastReset || null }); }
 function parseExtraTracks(p) { return parseProjectMeta(p).tracks; }
 function orderedPanels(p) {
   const meta = parseProjectMeta(p);
@@ -1398,7 +1448,7 @@ async function removeTrackUI(projectId, trackId) {
     const meta = parseProjectMeta(p);
     meta.tracks = meta.tracks.filter(t => t.id !== trackId);
     await sbDelete('team_project_steps', 'project_id=eq.' + projectId + '&track=eq.' + trackId);
-    await sbUpdate('team_projects', 'id=eq.' + projectId, { extra_track_name: (meta.tracks.length || meta.order) ? stringifyProjectMeta(meta) : null });
+    await sbUpdate('team_projects', 'id=eq.' + projectId, { extra_track_name: (meta.tracks.length || meta.order || meta.panelOrder || meta.lastReset) ? stringifyProjectMeta(meta) : null });
     refreshProjectView(projectId);
   } catch (e) { alert('Verwijderen mislukt: ' + e.message); }
 }
@@ -1837,12 +1887,15 @@ function setupDragDrop(listEl) {
 }
 
 // ================= Team settings (moderator only) =================
-function showTeamSettingsModal() {
+async function showTeamSettingsModal() {
   if (!currentIsModerator()) { alert('Alleen moderators kunnen teamleden beheren.'); return; }
+  await loadWeeklyResetMembers();
   renderTeamSettingsModal();
 }
 function renderTeamSettingsModal() {
-  const rows = teamMembers.map(m => `
+  const rows = teamMembers.map(m => {
+    const resetOn = weeklyResetMembers.includes(m.email);
+    return `
     <div class="field" style="display:flex;align-items:center;gap:8px;">
       <span class="color-swatch" style="background:${m.color};width:16px;height:16px;flex-shrink:0;"></span>
       <div style="flex:1;min-width:0;">
@@ -1850,9 +1903,11 @@ function renderTeamSettingsModal() {
         <div style="font-size:11px;color:var(--text-dim);">${escapeHtml(m.email)}</div>
       </div>
       <button class="small" onclick="editMemberColor('${m.email}')">Kleur</button>
+      <button class="small" onclick="toggleWeeklyResetMember('${m.email}')" title="Vinkjes op doorlopende projecten van dit teamlid automatisch resetten, elke zaterdag 16:00">Wekelijkse reset: ${resetOn ? 'aan' : 'uit'}</button>
       <button class="small" onclick="removeMemberUI('${m.email}')" ${m.email===currentUserEmail?'disabled title="Je kunt jezelf niet verwijderen"':''}>Verwijderen</button>
     </div>
-  `).join('');
+  `;
+  }).join('');
   renderModal(`
     <h2>Teamleden</h2>
     <div class="hint">Alleen moderators kunnen teamleden toevoegen of verwijderen. Alleen mensen in deze lijst kunnen inloggen en bewerken.</div>
@@ -1908,6 +1963,14 @@ function editMemberColor(email) {
       renderTeamSettingsModal();
     } catch (e) { alert('Opslaan mislukt: ' + e.message); }
   };
+}
+async function toggleWeeklyResetMember(email) {
+  if (!currentIsModerator()) return;
+  const next = weeklyResetMembers.includes(email) ? weeklyResetMembers.filter(e => e !== email) : [...weeklyResetMembers, email];
+  try {
+    await saveWeeklyResetMembers(next);
+    renderTeamSettingsModal();
+  } catch (e) { alert('Opslaan mislukt: ' + e.message); }
 }
 async function removeMemberUI(email) {
   if (email === currentUserEmail) return;
